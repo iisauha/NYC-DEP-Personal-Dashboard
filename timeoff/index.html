@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#eef2f1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d1418" media="(prefers-color-scheme: dark)">
+<meta name="description" content="My NYC DEP annual and sick leave.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Time Off">
+<title>My Time Off</title>
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
+<link rel="stylesheet" href="../assets/app.css">
+<style>
+  .page { padding-bottom: calc(40px + var(--safe-b)); }
+  .balances { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .bal { background: var(--surface); border-radius: var(--r-list); padding: 14px 16px 16px; }
+  .bal h2 { margin: 0; font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 7px; }
+  .bal h2::before { content: ""; width: 10px; height: 10px; border-radius: 3px; background: var(--c); }
+  .bal .days { font-size: 40px; line-height: 1.05; font-weight: 700; letter-spacing: -.02em; color: var(--c); margin-top: 10px; }
+  .bal .days span { font-size: 16px; font-weight: 500; color: var(--ink-2); letter-spacing: 0; margin-left: 4px; }
+  .bal .hours { font-size: 20px; font-weight: 600; margin-top: 6px; }
+  .bal .hours span { font-size: 14px; font-weight: 400; color: var(--ink-2); margin-left: 4px; }
+  .strip { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 12px; }
+  .strip i { width: 12px; height: 18px; border-radius: 3px; display: block;
+    background: linear-gradient(to top, var(--c) var(--p, 100%), var(--tint) var(--p, 100%)); }
+  .annual { --c: var(--annual); --tint: var(--annual-tint); }
+  .sick { --c: var(--sick); --tint: var(--sick-tint); }
+  .credit-amt { text-align: right; white-space: nowrap; font-size: 15px; line-height: 1.35; }
+  .credit-amt .a { color: var(--annual); font-weight: 600; }
+  .credit-amt .s { color: var(--sick); font-weight: 600; }
+  .log { margin-top: 16px; }
+  .empty { color: var(--ink-2); font-size: 15px; padding: 14px 16px; }
+  .preview { font-size: 14px; color: var(--ink-2); margin: 10px 16px 0; min-height: 20px; }
+  @media (max-width: 360px) { .bal .days { font-size: 34px; } .balances { gap: 8px; } }
+</style>
+</head>
+<body>
+
+<header class="appbar" id="appbar">
+  <div class="appbar-row">
+    <div class="appbar-side"><button class="icon-btn" id="backBtn" hidden aria-label="Back">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg><span>Back</span></button></div>
+    <div class="appbar-title" id="barTitle">My time off</div>
+    <div class="appbar-side end"><button class="icon-btn" id="editBtn">Edit</button></div>
+  </div>
+</header>
+
+<main class="page">
+  <!-- Home -->
+  <section id="view-home">
+    <h1 class="large-title">My time off</h1>
+    <div class="balances" id="balances"></div>
+
+    <h2 class="section-head">Hours added</h2>
+    <div class="list" id="credits"></div>
+
+    <button class="btn log" id="logBtn">Log time off</button>
+
+    <h2 class="section-head">Time off taken</h2>
+    <ul class="list" id="taken"></ul>
+  </section>
+
+  <!-- Edit -->
+  <section id="view-edit" hidden>
+    <h1 class="large-title" id="editTitle">Edit</h1>
+    <p class="section-foot" id="setupIntro" hidden style="margin:-6px 4px 0">Enter what CityTime shows today and how many hours you get each month. Everything stays on this device.</p>
+
+    <h2 class="section-head">Current balance</h2>
+    <div class="list">
+      <div class="field"><span class="label">Annual</span><span class="duration"><input type="number" inputmode="numeric" min="0" id="bA_h" aria-label="Annual hours"><span>h</span><input type="number" inputmode="numeric" min="0" max="59" id="bA_m" aria-label="Annual minutes"><span>m</span></span></div>
+      <div class="field"><span class="label">Sick</span><span class="duration"><input type="number" inputmode="numeric" min="0" id="bS_h" aria-label="Sick hours"><span>h</span><input type="number" inputmode="numeric" min="0" max="59" id="bS_m" aria-label="Sick minutes"><span>m</span></span></div>
+      <div class="field"><label for="bD">As of</label><input type="date" id="bD"></div>
+    </div>
+    <p class="section-foot">Update this whenever you check CityTime. Hours added after this date are counted automatically.</p>
+
+    <h2 class="section-head">Hours I get each month</h2>
+    <div class="list">
+      <div class="field"><span class="label">Annual</span><span class="duration"><input type="number" inputmode="numeric" min="0" id="rA_h" aria-label="Annual hours per month"><span>h</span><input type="number" inputmode="numeric" min="0" max="59" id="rA_m" aria-label="Annual minutes per month"><span>m</span></span></div>
+      <div class="field"><span class="label">Sick</span><span class="duration"><input type="number" inputmode="numeric" min="0" id="rS_h" aria-label="Sick hours per month"><span>h</span><input type="number" inputmode="numeric" min="0" max="59" id="rS_m" aria-label="Sick minutes per month"><span>m</span></span></div>
+      <div class="field" id="rFromRow"><label for="rFrom">Starting with</label><input type="month" id="rFrom"></div>
+    </div>
+    <p class="section-foot" id="rFromFoot">If this changes, set "Starting with" to the month it changed. Earlier months keep the old amount.</p>
+
+    <h2 class="section-head">Workday</h2>
+    <div class="list">
+      <div class="field"><span class="label">Hours in a day</span><span class="duration"><input type="number" inputmode="numeric" min="1" id="wD_h" aria-label="Hours"><span>h</span><input type="number" inputmode="numeric" min="0" max="59" id="wD_m" aria-label="Minutes"><span>m</span></span></div>
+      <div class="field"><label for="wS">First day on the job</label><input type="date" id="wS"></div>
+    </div>
+
+    <div class="sheet-actions"><button class="btn" id="saveEdit">Save</button></div>
+
+    <div id="moreSection">
+    <h2 class="section-head">More</h2>
+    <div class="list">
+      <a class="row" href="#dates"><div class="row-main"><div class="row-title">Dates hours get added</div></div><svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1 1l5.5 5.5L1 12" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></a>
+      <button class="row" id="installRow" hidden><div class="row-main"><div class="row-title">Install app</div></div></button>
+      <div class="row" id="iosInstallRow" hidden><div class="row-main"><div class="row-title">Add to Home Screen</div><div class="row-sub">In Safari, tap Share, then Add to Home Screen</div></div></div>
+      <button class="row" id="exportBtn"><div class="row-main"><div class="row-title">Export backup</div></div></button>
+      <button class="row" id="importBtn"><div class="row-main"><div class="row-title">Import backup</div></div></button>
+    </div>
+    <p class="section-foot">Saved on this device only. Use a backup to move it to another phone or computer.</p>
+    </div>
+    <input type="file" id="importFile" accept="application/json,.json" hidden>
+    <div class="list" id="setupImport" style="margin-top:12px"><button class="row action" id="importBtn2">Restore from a backup file</button></div>
+  </section>
+
+  <!-- Dates -->
+  <section id="view-dates" hidden>
+    <h1 class="large-title">Dates hours get added</h1>
+    <p class="section-foot" style="margin:0 4px 14px">Each month's hours are processed on the Saturday after the first full week of the next month and show up the Monday after. 2027 dates come from the city's official schedule. Change any date if CityTime shows something different.</p>
+    <div class="list" id="dateList"></div>
+    <div class="sheet-actions"><button class="btn secondary" id="resetDates">Reset dates</button></div>
+  </section>
+</main>
+
+<div class="scrim" id="scrim" hidden></div>
+<div class="sheet" id="sheet" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" hidden>
+  <div class="sheet-grip"></div>
+  <div class="sheet-head">
+    <button class="icon-btn" id="sheetCancel">Cancel</button>
+    <h2 id="sheetTitle"></h2>
+    <span style="flex:0 0 76px"></span>
+  </div>
+  <div class="sheet-body" id="sheetBody"></div>
+</div>
+
+<div class="snackbar" id="snackbar" role="status" aria-live="polite"><span id="snackText"></span><button id="snackAction" hidden>Undo</button></div>
+
+<script src="leave.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
