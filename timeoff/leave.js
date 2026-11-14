@@ -38,7 +38,7 @@
     startDate: null,
     dayMins: 420,
     anchor: { date: null, annual: 0, sick: 0 },
-    rates: [],          // [{from:'YYYY-MM', annual, sick}] minutes per month
+    rates: [],          // [{from:'YYYY-MM', title, annual, sick}] minutes per month; each applies until the next one
     postOverrides: {},  // {'YYYY-MM': 'YYYY-MM-DD'}
     uses: []            // [{id, date, type:'annual'|'sick', mins, note}]
   };

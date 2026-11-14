@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#eef2f1" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0d1418" media="(prefers-color-scheme: dark)">
-<meta name="description" content="My NYC DEP annual and sick leave.">
+<meta name="description" content="Track annual and sick leave.">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -30,12 +30,15 @@
     background: linear-gradient(to top, var(--c) var(--p, 100%), var(--tint) var(--p, 100%)); }
   .annual { --c: var(--annual); --tint: var(--annual-tint); }
   .sick { --c: var(--sick); --tint: var(--sick-tint); }
-  .credit-amt { text-align: right; white-space: nowrap; font-size: 15px; line-height: 1.35; }
-  .credit-amt .a { color: var(--annual); font-weight: 600; }
-  .credit-amt .s { color: var(--sick); font-weight: 600; }
-  .log { margin-top: 16px; }
+  .two { text-align: right; white-space: nowrap; font-size: 15px; line-height: 1.35; color: var(--ink-2); }
+  .two .a { color: var(--annual); font-weight: 600; }
+  .two .s { color: var(--sick); font-weight: 600; }
+  .actions { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 16px; }
   .empty { color: var(--ink-2); font-size: 15px; padding: 14px 16px; }
-  .preview { font-size: 14px; color: var(--ink-2); margin: 10px 16px 0; min-height: 20px; }
+  .note { font-size: 14px; color: var(--ink-2); margin: 10px 16px 0; line-height: 1.45; }
+  .note.warn { color: var(--warn); }
+  .pill.counted { background: var(--line); color: var(--ink-2); }
+  .pill.planned { background: var(--annual-tint); color: var(--annual); }
   @media (max-width: 360px) { .bal .days { font-size: 34px; } .balances { gap: 8px; } }
 </style>
 </head>
@@ -44,79 +47,90 @@
 <header class="appbar" id="appbar">
   <div class="appbar-row">
     <div class="appbar-side"><button class="icon-btn" id="backBtn" hidden aria-label="Back">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg><span>Back</span></button></div>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg><span id="backLabel">Back</span></button></div>
     <div class="appbar-title" id="barTitle">My time off</div>
-    <div class="appbar-side end"><button class="icon-btn" id="editBtn">Edit</button></div>
+    <div class="appbar-side end"><button class="icon-btn" id="settingsBtn">Settings</button></div>
   </div>
 </header>
 
 <main class="page">
+
   <!-- Home -->
-  <section id="view-home">
+  <section id="view-home" data-title="My time off">
     <h1 class="large-title">My time off</h1>
     <div class="balances" id="balances"></div>
 
     <h2 class="section-head">Hours added</h2>
     <div class="list" id="credits"></div>
 
-    <button class="btn log" id="logBtn">Log time off</button>
+    <div class="actions"><button class="btn" id="logBtn">Log time off</button></div>
 
-    <h2 class="section-head">Time off taken</h2>
+    <h2 class="section-head">Time off</h2>
     <ul class="list" id="taken"></ul>
+    <p class="section-foot" id="takenFoot" hidden></p>
   </section>
 
-  <!-- Edit -->
-  <section id="view-edit" hidden>
-    <h1 class="large-title" id="editTitle">Edit</h1>
-    <p class="section-foot" id="setupIntro" hidden style="margin:-6px 4px 0">Enter what CityTime shows today and how many hours you get each month. Everything stays on this device.</p>
+  <!-- Settings menu -->
+  <section id="view-settings" data-title="Settings" hidden>
+    <h1 class="large-title">Settings</h1>
 
-    <h2 class="section-head">Current balance</h2>
-    <div class="list">
-      <div class="field"><span class="label">Annual</span><span class="duration"><input type="number" inputmode="numeric" min="0" id="bA_h" aria-label="Annual hours"><span>h</span><input type="number" inputmode="numeric" min="0" max="59" id="bA_m" aria-label="Annual minutes"><span>m</span></span></div>
-      <div class="field"><span class="label">Sick</span><span class="duration"><input type="number" inputmode="numeric" min="0" id="bS_h" aria-label="Sick hours"><span>h</span><input type="number" inputmode="numeric" min="0" max="59" id="bS_m" aria-label="Sick minutes"><span>m</span></span></div>
-      <div class="field"><label for="bD">As of</label><input type="date" id="bD"></div>
-    </div>
-    <p class="section-foot">Update this whenever you check CityTime. Hours added after this date are counted automatically.</p>
+    <h2 class="section-head">Balance from CityTime</h2>
+    <div class="list"><button class="row" id="openBalance"><div class="row-main"><div class="row-title" id="balTitle"></div><div class="row-sub" id="balSub"></div></div>
+      <svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1 1l5.5 5.5L1 12" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button></div>
+    <p class="section-foot">Update this whenever you check CityTime. Anything before this date is already in that number.</p>
 
     <h2 class="section-head">Hours I get each month</h2>
-    <div class="list">
-      <div class="field"><span class="label">Annual</span><span class="duration"><input type="number" inputmode="numeric" min="0" id="rA_h" aria-label="Annual hours per month"><span>h</span><input type="number" inputmode="numeric" min="0" max="59" id="rA_m" aria-label="Annual minutes per month"><span>m</span></span></div>
-      <div class="field"><span class="label">Sick</span><span class="duration"><input type="number" inputmode="numeric" min="0" id="rS_h" aria-label="Sick hours per month"><span>h</span><input type="number" inputmode="numeric" min="0" max="59" id="rS_m" aria-label="Sick minutes per month"><span>m</span></span></div>
-      <div class="field" id="rFromRow"><label for="rFrom">Starting with</label><input type="month" id="rFrom"></div>
-    </div>
-    <p class="section-foot" id="rFromFoot">If this changes, set "Starting with" to the month it changed. Earlier months keep the old amount.</p>
+    <div class="list" id="rateList"></div>
+    <p class="section-foot">Got a new title or a raise in hours? Add it starting the month it changes. Earlier months stay the same.</p>
 
-    <h2 class="section-head">Workday</h2>
-    <div class="list">
-      <div class="field"><span class="label">Hours in a day</span><span class="duration"><input type="number" inputmode="numeric" min="1" id="wD_h" aria-label="Hours"><span>h</span><input type="number" inputmode="numeric" min="0" max="59" id="wD_m" aria-label="Minutes"><span>m</span></span></div>
-      <div class="field"><label for="wS">First day on the job</label><input type="date" id="wS"></div>
-    </div>
-
-    <div class="sheet-actions"><button class="btn" id="saveEdit">Save</button></div>
-
-    <div id="moreSection">
     <h2 class="section-head">More</h2>
     <div class="list">
-      <a class="row" href="#dates"><div class="row-main"><div class="row-title">Dates hours get added</div></div><svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1 1l5.5 5.5L1 12" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></a>
+      <button class="row" id="openWorkday"><div class="row-main"><div class="row-title">Workday and start date</div><div class="row-sub" id="workSub"></div></div>
+        <svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1 1l5.5 5.5L1 12" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button>
+      <a class="row" href="#dates"><div class="row-main"><div class="row-title">Dates hours get added</div></div>
+        <svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1 1l5.5 5.5L1 12" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></a>
       <button class="row" id="installRow" hidden><div class="row-main"><div class="row-title">Install app</div></div></button>
       <div class="row" id="iosInstallRow" hidden><div class="row-main"><div class="row-title">Add to Home Screen</div><div class="row-sub">In Safari, tap Share, then Add to Home Screen</div></div></div>
       <button class="row" id="exportBtn"><div class="row-main"><div class="row-title">Export backup</div></div></button>
       <button class="row" id="importBtn"><div class="row-main"><div class="row-title">Import backup</div></div></button>
     </div>
-    <p class="section-foot">Saved on this device only. Use a backup to move it to another phone or computer.</p>
-    </div>
-    <input type="file" id="importFile" accept="application/json,.json" hidden>
-    <div class="list" id="setupImport" style="margin-top:12px"><button class="row action" id="importBtn2">Restore from a backup file</button></div>
+    <p class="section-foot">Saved on this device only. Export a backup now and then.</p>
   </section>
 
   <!-- Dates -->
-  <section id="view-dates" hidden>
+  <section id="view-dates" data-title="Dates hours get added" hidden>
     <h1 class="large-title">Dates hours get added</h1>
-    <p class="section-foot" style="margin:0 4px 14px">Each month's hours are processed on the Saturday after the first full week of the next month and show up the Monday after. 2027 dates come from the city's official schedule. Change any date if CityTime shows something different.</p>
+    <p class="section-foot" style="margin:0 4px 14px">Each month's hours are processed the Saturday after the first full week of the next month and show up the Monday after. 2027 dates come from the city's official schedule. Change any date if CityTime shows something different.</p>
     <div class="list" id="dateList"></div>
-    <div class="sheet-actions"><button class="btn secondary" id="resetDates">Reset dates</button></div>
+    <div class="actions"><button class="btn secondary" id="resetDates">Reset dates</button></div>
+  </section>
+
+  <!-- First-run setup -->
+  <section id="view-setup" data-title="Set up" hidden>
+    <h1 class="large-title">Set up</h1>
+    <p class="section-foot" style="margin:-6px 4px 0">Enter what CityTime shows today and how many hours you get each month. Everything stays on this device.</p>
+    <h2 class="section-head">Balance today</h2>
+    <div class="list">
+      <div class="field"><span class="label">Annual</span><span class="duration" data-dur="sA"></span></div>
+      <div class="field"><span class="label">Sick</span><span class="duration" data-dur="sS"></span></div>
+    </div>
+    <h2 class="section-head">Hours I get each month</h2>
+    <div class="list">
+      <div class="field"><span class="label">Annual</span><span class="duration" data-dur="sRA"></span></div>
+      <div class="field"><span class="label">Sick</span><span class="duration" data-dur="sRS"></span></div>
+      <div class="field"><label for="sTitle">Title</label><input type="text" id="sTitle" placeholder="Optional" maxlength="40" style="text-align:right"></div>
+    </div>
+    <h2 class="section-head">Job</h2>
+    <div class="list">
+      <div class="field"><label for="sStart">First day</label><input type="date" id="sStart"></div>
+      <div class="field"><span class="label">Hours in a workday</span><span class="duration" data-dur="sDay"></span></div>
+    </div>
+    <div class="actions"><button class="btn" id="setupSave">Start tracking</button>
+      <button class="btn secondary" id="setupImport">Restore from a backup file</button></div>
   </section>
 </main>
+
+<input type="file" id="importFile" accept="application/json,.json" hidden>
 
 <div class="scrim" id="scrim" hidden></div>
 <div class="sheet" id="sheet" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" hidden>

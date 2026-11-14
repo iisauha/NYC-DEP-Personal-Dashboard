@@ -1,5 +1,5 @@
 /* Offline support: app shell is cached; pages update in the background (stale-while-revalidate). */
-const CACHE = 'dep-dashboard-v4';
+const CACHE = 'dep-dashboard-v5';
 const SHELL = [
   './', './index.html', './manifest.webmanifest', './assets/app.css',
   './timeoff/', './timeoff/index.html', './timeoff/app.js', './timeoff/leave.js',
