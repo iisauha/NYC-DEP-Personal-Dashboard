@@ -45,12 +45,6 @@ window.addEventListener('scroll', () => $('appbar').classList.toggle('scrolled',
 function refresh() { ({ home: renderHome, settings: renderSettings, dates: renderDates, setup: renderSetup })[view](); }
 
 /* ---------- home ---------- */
-function strip(mins) {
-  const d = Math.max(0, mins / S.dayMins), whole = Math.floor(d), frac = d - whole;
-  let h = '<i></i>'.repeat(Math.min(whole, 30));
-  if (whole < 30 && frac > 0.001) h += `<i style="--p:${Math.round(frac * 100)}%"></i>`;
-  return h;
-}
 const two = (a, s, sign = '+') => `<div class="two"><span class="a">${sign}${L.fmtHM(a)}</span> annual<br><span class="s">${sign}${L.fmtHM(s)}</span> sick</div>`;
 
 function renderHome() {
@@ -60,7 +54,6 @@ function renderHome() {
       <h2>${NAME[k]}</h2>
       <div class="days ${b[k] < 0 ? 'neg' : ''}">${days(b[k])}<span>${dayWord(b[k])}</span></div>
       <div class="hours">${L.fmtHM(b[k])}<span>total</span></div>
-      <div class="strip" aria-hidden="true">${strip(b[k])}</div>
     </section>`).join('');
 
   const last = L.lastCredit(S, t), next = L.nextCredit(S, t);
