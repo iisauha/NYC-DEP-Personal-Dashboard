@@ -88,6 +88,40 @@
     if (date >= S.anchor.date) for (const e of events(S, date)) { a += e.annual; s += e.sick; }
     return { annual: a, sick: s };
   }
+  /* Step series of one balance from the start date to `to`, for the chart.
+     Before the CityTime balance date it works backward from that balance; after it, forward.
+     Returns [{date, value}] where each point is the balance from that date on. */
+  function series(S, type, to) {
+    const changes = [];
+    let ym = S.startDate.slice(0, 7);
+    for (let i = 0; i < 360; i++) {
+      const pd = postDate(S, ym); if (pd > to) break;
+      const r = rateFor(S, ym);
+      if (r && r[type] && pd >= S.startDate) changes.push({ date: pd, delta: r[type] });
+      ym = nextMonth(ym);
+    }
+    for (const u of S.uses) if (u.type === type && u.date <= to && u.date >= S.startDate) changes.push({ date: u.date, delta: -u.mins });
+    changes.sort((a, b) => a.date.localeCompare(b.date));
+    const anchorVal = S.anchor[type], ad = S.anchor.date;
+    // balance at start = anchor minus everything that happened on or before the anchor date
+    let v = anchorVal;
+    for (const c of changes) if (c.date <= ad) v -= c.delta;
+    const pts = [{ date: S.startDate, value: v }];
+    for (const c of changes) { v += c.delta; pts.push({ date: c.date, value: c.date <= ad ? null : v, raw: v }); }
+    // values on or before the anchor date come from the backward pass; after it, from the anchor forward
+    for (const p of pts.slice(1)) { if (p.value === null) p.value = p.raw; delete p.raw; }
+    // make sure the line passes exactly through the CityTime number on its date
+    if (ad >= S.startDate && ad <= to) pts.push({ date: ad, value: valueAt(pts, ad) });
+    pts.sort((a, b) => a.date.localeCompare(b.date));
+    pts.push({ date: to, value: valueAt(pts, to) });
+    return pts;
+  }
+  function valueAt(pts, date) {
+    let v = pts.length ? pts[0].value : 0;
+    for (const p of pts) { if (p.date <= date) v = p.value; else break; }
+    return v;
+  }
+
   function lastCredit(S, onOrBefore) {
     let ym = S.startDate.slice(0, 7), last = null;
     for (let i = 0; i < 360; i++) {
@@ -123,6 +157,6 @@
   const fmtMonth = ym => parse(ym + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   global.Leave = { KEY, DEFAULT, OFFICIAL, load, save, iso, parse, addDays, today, nextMonth,
-    defaultPost, postDate, postSource, rateFor, events, balanceOn, nextCredit, lastCredit,
+    defaultPost, postDate, postSource, rateFor, events, balanceOn, nextCredit, lastCredit, series, valueAt,
     fmtHM, fmtDays, toDays, fmtDate, fmtMonth };
 })(window);

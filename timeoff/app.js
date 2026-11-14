@@ -35,48 +35,188 @@ function route() {
   $('settingsBtn').hidden = view !== 'home';
   $('barTitle').textContent = $('view-' + view).dataset.title;
   $('snackbar').classList.remove('show');
+  if (view !== 'home') document.body.classList.remove('sick-mode');
+  const el = $('view-' + view); el.classList.remove('view-enter'); void el.offsetWidth; el.classList.add('view-enter');
   window.scrollTo(0, 0);
-  ({ home: renderHome, settings: renderSettings, dates: renderDates, setup: renderSetup })[view]();
+  ({ home: () => { shown = null; renderHome(true); }, settings: () => { renderSettings(); applyTheme(); }, dates: renderDates, setup: renderSetup })[view]();
 }
 window.addEventListener('hashchange', route);
 $('settingsBtn').addEventListener('click', () => { location.hash = 'settings'; });
 $('backBtn').addEventListener('click', () => { location.hash = PARENT[view] === 'home' ? '' : PARENT[view]; });
 window.addEventListener('scroll', () => $('appbar').classList.toggle('scrolled', window.scrollY > 40), { passive: true });
-function refresh() { ({ home: renderHome, settings: renderSettings, dates: renderDates, setup: renderSetup })[view](); }
+function refresh() { ({ home: () => renderHome(true), settings: renderSettings, dates: renderDates, setup: renderSetup })[view](); }
+
+/* ---------- segmented controls with a sliding thumb ---------- */
+function placeThumb(group) {
+  const on = group.querySelector('button[aria-pressed="true"]'), th = group.querySelector('.thumb');
+  if (!on || !th) return;
+  th.style.width = on.offsetWidth + 'px';
+  th.style.transform = `translateX(${on.offsetLeft - 4}px)`;
+}
+function pressOne(group, btn) {
+  group.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === btn));
+  placeThumb(group);
+}
+window.addEventListener('resize', () => document.querySelectorAll('.segmented').forEach(placeThumb));
+
+/* ---------- theme ---------- */
+function applyTheme() {
+  const t = S.theme || 'light';
+  document.documentElement.dataset.theme = t;
+  const dark = t === 'dark' || (t === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+  $('themeColor').content = dark ? '#000000' : '#ffffff';
+  const g = $('themeToggle');
+  g.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x.dataset.theme === t));
+  placeThumb(g);
+}
+$('themeToggle').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  S.theme = b.dataset.theme; persist(); applyTheme(); drawChart(false);
+});
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { applyTheme(); });
 
 /* ---------- home ---------- */
-const two = (a, s, sign = '+') => `<div class="two"><span class="a">${sign}${L.fmtHM(a)}</span> annual<br><span class="s">${sign}${L.fmtHM(s)}</span> sick</div>`;
+let leaveType = 'annual';
+let shown = null;          // number currently on screen (days), for count-up
+let countRAF = 0;
+function setBig(mins, animate) {
+  const target = mins / S.dayMins;
+  const el = $('bigNum');
+  const fmt = v => (Math.round(v * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  cancelAnimationFrame(countRAF);
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!animate || shown === null || reduce) { el.textContent = fmt(target); shown = target; }
+  else {
+    const from = shown, t0 = performance.now(), dur = 650;
+    const step = now => {
+      const p = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - p, 4);
+      const v = from + (target - from) * e; el.textContent = fmt(v); shown = v;
+      if (p < 1) countRAF = requestAnimationFrame(step);
+    };
+    countRAF = requestAnimationFrame(step);
+  }
+  el.classList.toggle('neg', mins < 0);
+  $('bigUnit').textContent = Math.abs(target) === 1 ? 'day' : 'days';
+  $('subHours').textContent = `${L.fmtHM(mins)} total`;
+}
+function setDeltaDefault() {
+  const last = L.lastCredit(S, L.today()), d = $('delta');
+  d.classList.remove('scrub');
+  d.textContent = last ? `+${L.fmtHM(last[leaveType])} added ${L.fmtDate(last.date, { month: 'short', day: 'numeric' })}` : '';
+}
 
-function renderHome() {
+$('typeToggle').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b || b.dataset.t === leaveType) return;
+  leaveType = b.dataset.t; pressOne($('typeToggle'), b);
+  document.body.classList.toggle('sick-mode', leaveType === 'sick');
+  renderHome(true);
+});
+
+function renderHome(animate) {
   const t = L.today(), b = L.balanceOn(S, t);
-  $('balances').innerHTML = ['annual', 'sick'].map(k => `
-    <section class="bal ${k}" aria-label="${NAME[k]}">
-      <h2>${NAME[k]}</h2>
-      <div class="days ${b[k] < 0 ? 'neg' : ''}">${days(b[k])}<span>${dayWord(b[k])}</span></div>
-      <div class="hours">${L.fmtHM(b[k])}<span>total</span></div>
-    </section>`).join('');
+  document.body.classList.toggle('sick-mode', leaveType === 'sick');
+  placeThumb($('typeToggle'));
+  setBig(b[leaveType], animate !== false);
+  setDeltaDefault();
+  drawChart(true);
 
   const last = L.lastCredit(S, t), next = L.nextCredit(S, t);
-  const row = (label, c, est) => c ? `<div class="row"><div class="row-main">
-      <div class="row-title">${label}: ${dShort(c.date)}</div>
-      <div class="row-sub">${mName(c.ym)} hours${est ? ', estimated date' : ''}</div></div>${two(c.annual, c.sick)}</div>` : '';
+  const row = (label, c, est) => c ? `<div class="row"><span class="badge-icon ${leaveType}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 6v12M6 12h12"/></svg></span>
+      <div class="row-main"><div class="row-title">${label}</div>
+      <div class="row-sub">${dShort(c.date)}, ${mName(c.ym)} hours${est ? ' (estimated)' : ''}</div></div>
+      <div class="row-value credit-amt">+${L.fmtHM(c[leaveType])}</div></div>` : '';
   $('credits').innerHTML = (row('Last added', last) + row('Next', next, next && L.postSource(S, next.ym) === 'estimated'))
     || '<div class="empty">Add your monthly hours in Settings.</div>';
 
-  const uses = [...S.uses].sort((x, y) => y.date.localeCompare(x.date));
+  const uses = [...S.uses].filter(u => u.type === leaveType).sort((x, y) => y.date.localeCompare(x.date));
   let counted = false;
   $('taken').innerHTML = uses.length ? uses.map(u => {
     const tag = u.date > t ? '<span class="pill planned">Planned</span>'
-      : u.date <= S.anchor.date ? (counted = true, '<span class="pill counted">In CityTime balance</span>') : '';
-    return `<li><button class="row has-icon" data-use="${u.id}">
+      : u.date <= S.anchor.date ? (counted = true, '<span class="pill counted">In CityTime</span>') : '';
+    return `<li><button class="row" data-use="${u.id}">
       <span class="badge-icon ${u.type}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 12h12"/></svg></span>
-      <div class="row-main"><div class="row-title">${NAME[u.type]} ${tag}</div>
-      <div class="row-sub">${dShort(u.date)}${u.note ? ', ' + esc(u.note) : ''}</div></div>
-      <div class="row-value"><strong>−${L.fmtHM(u.mins)}</strong><small>${days(u.mins)} ${dayWord(u.mins)}</small></div>${CHEV}</button></li>`;
-  }).join('') : '<li class="empty">Nothing logged yet. Tap Log time off when you take or plan a day.</li>';
+      <div class="row-main"><div class="row-title">${dShort(u.date)} ${tag}</div>
+      <div class="row-sub">${u.note ? esc(u.note) : NAME[u.type] + ' leave'}</div></div>
+      <div class="row-value">−${L.fmtHM(u.mins)}<small>${days(u.mins)} ${dayWord(u.mins)}</small></div></button></li>`;
+  }).join('') : `<li class="empty">No ${leaveType} time off logged yet.</li>`;
   $('takenFoot').hidden = !counted;
-  $('takenFoot').textContent = `"In CityTime balance" means it's on or before ${dShort(S.anchor.date)}, the date of your balance, so it isn't subtracted again.`;
+  $('takenFoot').textContent = `"In CityTime" means it's on or before ${dShort(S.anchor.date)}, the date of your balance, so it isn't subtracted again.`;
 }
+
+/* ---------- chart: balance over time, drag to scrub ---------- */
+let chart = null;
+function drawChart(animate) {
+  const wrap = $('chart'); if (!wrap || wrap.offsetParent === null) return;
+  const t = L.today();
+  const start = S.startDate;
+  const end = L.iso(L.addDays(L.parse(t), 183));
+  const pts = L.series(S, leaveType, end);
+  const W = wrap.clientWidth, H = wrap.clientHeight, padX = 20, padTop = 14, padBot = 10;
+  const t0 = L.parse(start).getTime(), t1 = L.parse(end).getTime();
+  const xOf = d => padX + (L.parse(d).getTime() - t0) / Math.max(1, t1 - t0) * (W - padX * 2);
+  const vals = pts.map(p => p.value);
+  const vMin = Math.min(0, ...vals), vMax = Math.max(...vals, S.dayMins);
+  const yOf = v => padTop + (1 - (v - vMin) / Math.max(1, vMax - vMin)) * (H - padTop - padBot);
+  const step = list => list.map((p, i) => i === 0 ? `M${xOf(p.date).toFixed(1)},${yOf(p.value).toFixed(1)}`
+    : `H${xOf(p.date).toFixed(1)}V${yOf(p.value).toFixed(1)}`).join('');
+  const todayVal = L.valueAt(pts, t);
+  const past = pts.filter(p => p.date <= t).concat({ date: t, value: todayVal });
+  const future = [{ date: t, value: todayVal }].concat(pts.filter(p => p.date > t));
+  const pastD = step(past), futD = step(future);
+  const area = `${pastD}V${(H - padBot).toFixed(1)}H${xOf(start).toFixed(1)}Z`;
+  const xt = xOf(t), yt = yOf(todayVal);
+  wrap.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+    <defs><linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="var(--accent)" stop-opacity=".18"/><stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>
+    ${vMin < 0 ? `<line class="chart-zero" x1="0" x2="${W}" y1="${yOf(0)}" y2="${yOf(0)}"/>` : ''}
+    <line class="chart-today" x1="${xt}" x2="${xt}" y1="0" y2="${H}"/>
+    <path class="chart-area${animate ? ' fade-up' : ''}" d="${area}"/>
+    <path class="chart-line past" id="linePast" d="${pastD}"/>
+    <path class="chart-line future" d="${futD}"/>
+    <line class="chart-cursor" id="cursor" x1="0" x2="0" y1="0" y2="${H}"/>
+    <circle class="chart-pulse" id="pulse" cx="${xt}" cy="${yt}" r="7"/>
+    <circle class="chart-dot" id="dot" cx="${xt}" cy="${yt}" r="6"/>
+  </svg>`;
+  const lp = $('linePast');
+  if (animate && lp.getTotalLength && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const len = lp.getTotalLength();
+    lp.style.strokeDasharray = len; lp.style.setProperty('--len', len); lp.classList.add('draw');
+  }
+  $('lblStart').textContent = L.fmtDate(start, { month: 'short', year: 'numeric' });
+  $('lblEnd').textContent = L.fmtDate(end, { month: 'short', year: 'numeric' });
+  chart = { pts, xOf, yOf, W, padX, t0, t1, start, end };
+}
+
+let lastScrubVal = null;
+function scrubAt(clientX) {
+  if (!chart) return;
+  const wrap = $('chart'), r = wrap.getBoundingClientRect();
+  const x = Math.max(chart.padX, Math.min(chart.W - chart.padX, clientX - r.left));
+  const ms = chart.t0 + (x - chart.padX) / (chart.W - chart.padX * 2) * (chart.t1 - chart.t0);
+  const date = L.iso(new Date(ms));
+  const v = L.valueAt(chart.pts, date);
+  wrap.classList.add('scrubbing');
+  const c = $('cursor'); c.setAttribute('x1', x); c.setAttribute('x2', x);
+  const dot = $('dot'); dot.setAttribute('cx', x); dot.setAttribute('cy', chart.yOf(v));
+  setBig(v, false);
+  const d = $('delta'); d.classList.add('scrub');
+  d.textContent = L.fmtDate(date, { month: 'short', day: 'numeric', year: 'numeric' }) + (date > L.today() ? ', projected' : '');
+  if (lastScrubVal !== null && v !== lastScrubVal && navigator.vibrate) navigator.vibrate(4);
+  lastScrubVal = v;
+}
+function endScrub() {
+  const wrap = $('chart'); if (!wrap.classList.contains('scrubbing')) return;
+  wrap.classList.remove('scrubbing'); lastScrubVal = null;
+  const t = L.today(), v = L.balanceOn(S, t)[leaveType];
+  const dot = $('dot'); dot.setAttribute('cx', chart.xOf(t)); dot.setAttribute('cy', chart.yOf(v));
+  setBig(v, true); setDeltaDefault();
+}
+$('chart').addEventListener('pointerdown', e => { $('chart').setPointerCapture(e.pointerId); scrubAt(e.clientX); });
+$('chart').addEventListener('pointermove', e => { if (e.pointerType === 'mouse' && !e.buttons && !$('chart').classList.contains('scrubbing')) { scrubAt(e.clientX); return; } if ($('chart').classList.contains('scrubbing')) scrubAt(e.clientX); });
+$('chart').addEventListener('pointerup', endScrub);
+$('chart').addEventListener('pointercancel', endScrub);
+$('chart').addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') endScrub(); });
+window.addEventListener('resize', () => { if (view === 'home') drawChart(false); });
 
 /* ---------- sheets ---------- */
 let lastFocus = null;
@@ -104,9 +244,9 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('sheet'
 /* ---------- log / edit time off ---------- */
 function openTimeOff(u) {
   const editing = !!u;
-  let type = u ? u.type : 'annual';
+  let type = u ? u.type : leaveType;
   openSheet(editing ? 'Edit time off' : 'Log time off', `
-    <div class="segmented" role="group" aria-label="Type" id="tType" style="margin-bottom:14px">
+    <div class="segmented" role="group" aria-label="Type" id="tType" style="margin-bottom:14px"><span class="thumb" aria-hidden="true"></span>
       <button aria-pressed="${type === 'annual'}" data-t="annual">Annual</button><button aria-pressed="${type === 'sick'}" data-t="sick">Sick</button></div>
     <div class="list">
       <div class="field"><label for="tDate">Date</label><input type="date" id="tDate" value="${u ? u.date : L.today()}"></div>
@@ -135,8 +275,9 @@ function openTimeOff(u) {
       $('tPrev').innerHTML = html;
       $('tSave').disabled = mins <= 0;
     };
+    requestAnimationFrame(() => placeThumb($('tType')));
     $('tType').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; type = b.dataset.t;
-      $('tType').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b)); prev(); });
+      pressOne($('tType'), b); prev(); });
     body.querySelector('.chips').addEventListener('click', e => { if (e.target.dataset.q) { setDur('tHrs', +e.target.dataset.q); prev(); } });
     body.addEventListener('input', prev);
     $('tSave').addEventListener('click', () => {
@@ -164,6 +305,7 @@ document.addEventListener('click', e => {
 });
 
 /* ---------- settings ---------- */
+const two = (a, s) => `<div class="row-value"><span style="color:var(--annual)">+${L.fmtHM(a)}</span> annual<small><span style="color:var(--sick);font-weight:600">+${L.fmtHM(s)}</span> sick</small></div>`;
 function renderSettings() {
   $('balTitle').innerHTML = `<span style="color:var(--annual);font-weight:600">${L.fmtHM(S.anchor.annual)}</span> annual, <span style="color:var(--sick);font-weight:600">${L.fmtHM(S.anchor.sick)}</span> sick`;
   $('balSub').textContent = `As of ${L.fmtDate(S.anchor.date)}`;
@@ -363,5 +505,6 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController && !window.__reloaded) { window.__reloaded = true; location.reload(); } });
 }
 
+applyTheme();
 route();
 })();
