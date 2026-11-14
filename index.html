@@ -46,7 +46,11 @@
         `<span class="a"><b>${Leave.fmtDays(b.annual, S.dayMins)}</b> annual days</span> and <span class="s"><b>${Leave.fmtDays(b.sick, S.dayMins)}</b> sick</span>`;
     }
   } catch (e) {}
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  if ('serviceWorker' in navigator) {
+  const hadController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.register('sw.js').then(r => r.update()).catch(() => {});
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController && !window.__reloaded) { window.__reloaded = true; location.reload(); } });
+}
 </script>
 </body>
 </html>
