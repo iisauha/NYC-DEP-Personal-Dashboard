@@ -1,5 +1,6 @@
-/* Offline support: app shell is cached; pages update in the background (stale-while-revalidate). */
-const CACHE = 'dep-dashboard-v5';
+/* Offline support. Network first, so a new version shows up right away when online;
+   falls back to the cached copy when offline. */
+const CACHE = 'dep-dashboard-v6';
 const SHELL = [
   './', './index.html', './manifest.webmanifest', './assets/app.css',
   './timeoff/', './timeoff/index.html', './timeoff/app.js', './timeoff/leave.js',
@@ -7,7 +8,9 @@ const SHELL = [
 ];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE)
+    .then(c => c.addAll(SHELL.map(u => new Request(u, { cache: 'reload' }))))
+    .then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys()
@@ -17,12 +20,14 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
-  e.respondWith(caches.open(CACHE).then(async cache => {
-    const cached = await cache.match(req, { ignoreSearch: true });
-    const network = fetch(req).then(res => {
+  e.respondWith((async () => {
+    const cache = await caches.open(CACHE);
+    try {
+      const res = await fetch(req, { cache: 'no-cache' });
       if (res.ok) cache.put(req, res.clone());
       return res;
-    }).catch(() => cached);
-    return cached || network;
-  }));
+    } catch (err) {
+      return (await cache.match(req, { ignoreSearch: true })) || Response.error();
+    }
+  })());
 });
