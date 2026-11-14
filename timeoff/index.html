@@ -2,23 +2,30 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<script>
+  // Theme before first paint, and an iOS status bar that matches it:
+  // dark draws the app under the status bar (white text); light keeps a white bar (dark text).
+  (function () {
+    var t = 'light';
+    try { t = (JSON.parse(localStorage.getItem('nycdep.timeoff.v1')) || {}).theme || 'light'; } catch (e) {}
+    var dark = t === 'dark' || (t === 'auto' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.dataset.theme = t;
+    var m = document.createElement('meta'); m.name = 'apple-mobile-web-app-status-bar-style';
+    m.content = dark ? 'black-translucent' : 'default'; document.head.appendChild(m);
+    var c = document.createElement('meta'); c.name = 'theme-color'; c.id = 'themeColor';
+    c.content = dark ? '#000000' : '#ffffff'; document.head.appendChild(c);
+  })();
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#ffffff" id="themeColor">
 <meta name="description" content="Track annual and sick leave.">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Time Off">
 <title>My Time Off</title>
 <link rel="manifest" href="../manifest.webmanifest">
 <link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
 <link rel="stylesheet" href="../assets/app.css">
-<script>
-  // apply saved theme before paint (light by default)
-  try { document.documentElement.dataset.theme = (JSON.parse(localStorage.getItem('nycdep.timeoff.v1')) || {}).theme || 'light'; }
-  catch (e) { document.documentElement.dataset.theme = 'light'; }
-</script>
 <style>
   .hero { margin-top: 4px; }
   .hero .segmented { max-width: 260px; margin-bottom: 22px; }

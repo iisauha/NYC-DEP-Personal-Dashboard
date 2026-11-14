@@ -64,7 +64,9 @@ function applyTheme() {
   const t = S.theme || 'light';
   document.documentElement.dataset.theme = t;
   const dark = t === 'dark' || (t === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
-  $('themeColor').content = dark ? '#000000' : '#ffffff';
+  const tc = document.getElementById('themeColor'); if (tc) tc.content = dark ? '#000000' : '#ffffff';
+  const sb = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+  if (sb) sb.content = dark ? 'black-translucent' : 'default';
   const g = $('themeToggle');
   g.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x.dataset.theme === t));
   placeThumb(g);
@@ -72,6 +74,7 @@ function applyTheme() {
 $('themeToggle').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   S.theme = b.dataset.theme; persist(); applyTheme(); drawChart(false);
+  if (navigator.standalone) snack('Close and reopen the app to update the top bar');
 });
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { applyTheme(); });
 
