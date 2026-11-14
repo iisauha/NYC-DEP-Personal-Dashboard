@@ -37,13 +37,13 @@ function route() {
   $('snackbar').classList.remove('show');
   if (view !== 'home') document.body.classList.remove('sick-mode');
   const el = $('view-' + view); el.classList.remove('view-enter'); void el.offsetWidth; el.classList.add('view-enter');
-  window.scrollTo(0, 0);
+  $('scroller').scrollTop = 0;
   ({ home: () => { shown = null; renderHome(true); }, settings: () => { renderSettings(); applyTheme(); }, dates: renderDates, setup: renderSetup })[view]();
 }
 window.addEventListener('hashchange', route);
 $('settingsBtn').addEventListener('click', () => { location.hash = 'settings'; });
 $('backBtn').addEventListener('click', () => { location.hash = PARENT[view] === 'home' ? '' : PARENT[view]; });
-window.addEventListener('scroll', () => $('appbar').classList.toggle('scrolled', window.scrollY > 40), { passive: true });
+$('scroller').addEventListener('scroll', () => $('appbar').classList.toggle('scrolled', $('scroller').scrollTop > 40), { passive: true });
 function refresh() { ({ home: () => renderHome(true), settings: renderSettings, dates: renderDates, setup: renderSetup })[view](); }
 
 /* ---------- segmented controls with a sliding thumb ---------- */
@@ -146,79 +146,61 @@ function renderHome(animate) {
   $('takenFoot').textContent = `"In CityTime" means it's on or before ${dShort(S.anchor.date)}, the date of your balance, so it isn't subtracted again.`;
 }
 
-/* ---------- chart: balance over time, drag to scrub ---------- */
+/* ---------- chart: balance at the end of each month, drag or tap a bar ---------- */
 let chart = null;
+function monthEnd(ym) { const [y, m] = ym.split('-').map(Number); return L.iso(new Date(y, m, 0)); }
 function drawChart(animate) {
   const wrap = $('chart'); if (!wrap || wrap.offsetParent === null) return;
-  const t = L.today();
-  const start = S.startDate;
-  const end = L.iso(L.addDays(L.parse(t), 183));
-  const pts = L.series(S, leaveType, end);
-  const W = wrap.clientWidth, H = wrap.clientHeight, padX = 20, padTop = 14, padBot = 10;
-  const t0 = L.parse(start).getTime(), t1 = L.parse(end).getTime();
-  const xOf = d => padX + (L.parse(d).getTime() - t0) / Math.max(1, t1 - t0) * (W - padX * 2);
-  const vals = pts.map(p => p.value);
-  const vMin = Math.min(0, ...vals), vMax = Math.max(...vals, S.dayMins);
-  const yOf = v => padTop + (1 - (v - vMin) / Math.max(1, vMax - vMin)) * (H - padTop - padBot);
-  const step = list => list.map((p, i) => i === 0 ? `M${xOf(p.date).toFixed(1)},${yOf(p.value).toFixed(1)}`
-    : `H${xOf(p.date).toFixed(1)}V${yOf(p.value).toFixed(1)}`).join('');
-  const todayVal = L.valueAt(pts, t);
-  const past = pts.filter(p => p.date <= t).concat({ date: t, value: todayVal });
-  const future = [{ date: t, value: todayVal }].concat(pts.filter(p => p.date > t));
-  const pastD = step(past), futD = step(future);
-  const area = `${pastD}V${(H - padBot).toFixed(1)}H${xOf(start).toFixed(1)}Z`;
-  const xt = xOf(t), yt = yOf(todayVal);
-  wrap.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
-    <defs><linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="var(--accent)" stop-opacity=".18"/><stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>
-    ${vMin < 0 ? `<line class="chart-zero" x1="0" x2="${W}" y1="${yOf(0)}" y2="${yOf(0)}"/>` : ''}
-    <line class="chart-today" x1="${xt}" x2="${xt}" y1="0" y2="${H}"/>
-    <path class="chart-area${animate ? ' fade-up' : ''}" d="${area}"/>
-    <path class="chart-line past" id="linePast" d="${pastD}"/>
-    <path class="chart-line future" d="${futD}"/>
-    <line class="chart-cursor" id="cursor" x1="0" x2="0" y1="0" y2="${H}"/>
-    <circle class="chart-pulse" id="pulse" cx="${xt}" cy="${yt}" r="7"/>
-    <circle class="chart-dot" id="dot" cx="${xt}" cy="${yt}" r="6"/>
-  </svg>`;
-  const lp = $('linePast');
-  if (animate && lp.getTotalLength && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    const len = lp.getTotalLength();
-    lp.style.strokeDasharray = len; lp.style.setProperty('--len', len); lp.classList.add('draw');
-  }
-  $('lblStart').textContent = L.fmtDate(start, { month: 'short', year: 'numeric' });
-  $('lblEnd').textContent = L.fmtDate(end, { month: 'short', year: 'numeric' });
-  chart = { pts, xOf, yOf, W, padX, t0, t1, start, end };
+  const t = L.today(), nowYM = t.slice(0, 7);
+  let first = S.startDate.slice(0, 7);
+  // keep about 12 bars: up to 6 past months, this month, 5 ahead
+  const back = []; let ym = nowYM;
+  for (let i = 0; i < 6 && ym > first; i++) { ym = (([y, m]) => m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`)(ym.split('-').map(Number)); back.unshift(ym); }
+  const months = [...back, nowYM]; ym = nowYM;
+  for (let i = 0; i < 5; i++) { ym = L.nextMonth(ym); months.push(ym); }
+  const endDate = monthEnd(months[months.length - 1]);
+  const pts = L.series(S, leaveType, endDate);
+  const bars = months.map(m => {
+    const date = m === nowYM ? t : monthEnd(m);
+    return { ym: m, date, value: L.valueAt(pts, date), future: m > nowYM, now: m === nowYM };
+  });
+  const max = Math.max(S.dayMins, ...bars.map(b => b.value));
+  wrap.innerHTML = `<div class="bars">${bars.map((b, i) => `
+      <div class="bar-col${b.future ? ' future' : ''}${b.now ? ' now' : ''}" data-i="${i}">
+        <div class="bar${animate ? ' grow' : ''}" style="height:${Math.max(2, Math.max(0, b.value) / max * 100)}%;animation-delay:${i * 35}ms"></div>
+        <span class="bar-lbl">${L.parse(b.ym + '-01').toLocaleDateString('en-US', { month: 'narrow' })}</span>
+      </div>`).join('')}</div>`;
+  $('lblStart').textContent = L.fmtMonth(months[0]).replace(/ (\d{4})$/, ' $1');
+  $('lblEnd').textContent = L.fmtMonth(months[months.length - 1]);
+  chart = { bars };
 }
-
-let lastScrubVal = null;
+let selBar = null;
 function scrubAt(clientX) {
   if (!chart) return;
-  const wrap = $('chart'), r = wrap.getBoundingClientRect();
-  const x = Math.max(chart.padX, Math.min(chart.W - chart.padX, clientX - r.left));
-  const ms = chart.t0 + (x - chart.padX) / (chart.W - chart.padX * 2) * (chart.t1 - chart.t0);
-  const date = L.iso(new Date(ms));
-  const v = L.valueAt(chart.pts, date);
-  wrap.classList.add('scrubbing');
-  const c = $('cursor'); c.setAttribute('x1', x); c.setAttribute('x2', x);
-  const dot = $('dot'); dot.setAttribute('cx', x); dot.setAttribute('cy', chart.yOf(v));
-  setBig(v, false);
+  const cols = [...$('chart').querySelectorAll('.bar-col')];
+  let i = cols.findIndex(c => { const r = c.getBoundingClientRect(); return clientX >= r.left - 2 && clientX <= r.right + 2; });
+  if (i < 0) { const r0 = cols[0].getBoundingClientRect(); i = clientX < r0.left ? 0 : cols.length - 1; }
+  if (i === selBar) return;
+  if (selBar !== null && navigator.vibrate) navigator.vibrate(4);
+  selBar = i;
+  cols.forEach((c, k) => c.classList.toggle('sel', k === i));
+  $('chart').classList.add('scrubbing');
+  const b = chart.bars[i];
+  setBig(b.value, true);
   const d = $('delta'); d.classList.add('scrub');
-  d.textContent = L.fmtDate(date, { month: 'short', day: 'numeric', year: 'numeric' }) + (date > L.today() ? ', projected' : '');
-  if (lastScrubVal !== null && v !== lastScrubVal && navigator.vibrate) navigator.vibrate(4);
-  lastScrubVal = v;
+  d.textContent = b.now ? 'Today' : `End of ${L.fmtMonth(b.ym)}${b.future ? ', projected' : ''}`;
 }
 function endScrub() {
   const wrap = $('chart'); if (!wrap.classList.contains('scrubbing')) return;
-  wrap.classList.remove('scrubbing'); lastScrubVal = null;
-  const t = L.today(), v = L.balanceOn(S, t)[leaveType];
-  const dot = $('dot'); dot.setAttribute('cx', chart.xOf(t)); dot.setAttribute('cy', chart.yOf(v));
-  setBig(v, true); setDeltaDefault();
+  wrap.classList.remove('scrubbing'); selBar = null;
+  wrap.querySelectorAll('.bar-col.sel').forEach(c => c.classList.remove('sel'));
+  setBig(L.balanceOn(S, L.today())[leaveType], true); setDeltaDefault();
 }
-$('chart').addEventListener('pointerdown', e => { $('chart').setPointerCapture(e.pointerId); scrubAt(e.clientX); });
-$('chart').addEventListener('pointermove', e => { if (e.pointerType === 'mouse' && !e.buttons && !$('chart').classList.contains('scrubbing')) { scrubAt(e.clientX); return; } if ($('chart').classList.contains('scrubbing')) scrubAt(e.clientX); });
-$('chart').addEventListener('pointerup', endScrub);
-$('chart').addEventListener('pointercancel', endScrub);
-$('chart').addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') endScrub(); });
+let scrubbing = false;
+$('chart').addEventListener('pointerdown', e => { scrubbing = true; $('chart').setPointerCapture(e.pointerId); scrubAt(e.clientX); });
+$('chart').addEventListener('pointermove', e => { if (scrubbing) scrubAt(e.clientX); });
+$('chart').addEventListener('pointerup', () => { scrubbing = false; setTimeout(endScrub, 900); });
+$('chart').addEventListener('pointercancel', () => { scrubbing = false; endScrub(); });
 window.addEventListener('resize', () => { if (view === 'home') drawChart(false); });
 
 /* ---------- sheets ---------- */
@@ -230,13 +212,11 @@ function openSheet(title, html, onReady) {
   $('sheetBody').replaceChildren(inner); // fresh element so old listeners never stack up
   $('scrim').hidden = false; $('sheet').hidden = false;
   requestAnimationFrame(() => { $('scrim').classList.add('open'); $('sheet').classList.add('open'); });
-  document.body.style.overflow = 'hidden';
   onReady && onReady(inner);
   setTimeout(() => $('sheet').focus({ preventScroll: true }), 50);
 }
 function closeSheet() {
   $('scrim').classList.remove('open'); $('sheet').classList.remove('open');
-  document.body.style.overflow = '';
   setTimeout(() => { if (!$('sheet').classList.contains('open')) { $('scrim').hidden = true; $('sheet').hidden = true; $('sheetBody').replaceChildren(); } }, 260);
   lastFocus && lastFocus.focus({ preventScroll: true });
 }

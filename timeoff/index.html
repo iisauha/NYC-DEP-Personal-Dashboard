@@ -34,22 +34,22 @@
   .sub-hours { font-size: 17px; font-weight: 600; color: var(--ink-2); margin-top: 8px; }
   .delta { font-size: 15px; font-weight: 700; color: var(--accent); margin-top: 6px; min-height: 21px; transition: color .3s; }
   .delta.scrub { color: var(--ink-2); }
-  .chart-wrap { position: relative; margin: 18px calc(-1 * var(--gutter)) 0; height: 190px; touch-action: none; user-select: none; -webkit-user-select: none; cursor: crosshair; }
-  .chart-wrap svg { display: block; width: 100%; height: 100%; overflow: visible; }
-  .chart-line { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; transition: stroke .3s; }
-  .chart-line.future { stroke-dasharray: 2 6; opacity: .7; }
-  .chart-area { fill: url(#areaGrad); }
-  .chart-today { stroke: var(--line); stroke-width: 1; stroke-dasharray: 3 4; }
-  .chart-zero { stroke: var(--line); stroke-width: 1; }
-  .chart-cursor { stroke: var(--ink-3); stroke-width: 1; opacity: 0; transition: opacity .15s; }
-  .chart-dot { fill: var(--accent); stroke: var(--bg); stroke-width: 3; transition: fill .3s; }
-  .chart-pulse { fill: var(--accent); opacity: .25; transform-box: fill-box; transform-origin: center; animation: pulse 1.8s ease-out infinite; }
-  @keyframes pulse { 0% { transform: scale(.6); opacity: .45; } 100% { transform: scale(2.4); opacity: 0; } }
-  .scrubbing .chart-cursor { opacity: 1; }
-  .scrubbing .chart-pulse { display: none; }
+  .chart-wrap { margin-top: 22px; height: 170px; touch-action: none; user-select: none; -webkit-user-select: none; cursor: pointer; }
+  .bars { display: flex; align-items: stretch; gap: 6px; height: 100%; }
+  .bar-col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 8px; min-width: 0; }
+  .bar { width: 100%; max-width: 26px; border-radius: 7px 7px 3px 3px; background: var(--accent); opacity: .28; transform-origin: bottom;
+    transition: opacity .2s, transform .25s var(--spring), background-color .3s; }
+  .bar-col.now .bar { opacity: 1; }
+  .bar-col.future .bar { background: repeating-linear-gradient(135deg, var(--accent) 0 3px, transparent 3px 7px); opacity: .55; }
+  .scrubbing .bar-col .bar { opacity: .18; }
+  .scrubbing .bar-col.future .bar { opacity: .35; }
+  .bar-col.sel .bar { opacity: 1 !important; transform: scaleX(1.12); }
+  .bar-col.sel.future .bar { background: var(--accent); opacity: .6 !important; }
+  .bar-lbl { font-size: 11px; font-weight: 700; color: var(--ink-3); flex: 0 0 auto; line-height: 1; }
+  .bar-col.now .bar-lbl, .bar-col.sel .bar-lbl { color: var(--ink); }
+  .grow { animation: grow .6s var(--spring) backwards; }
+  @keyframes grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
   .chart-labels { display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; color: var(--ink-3); margin-top: 8px; }
-  .draw { animation: draw 1s var(--ease) both; }
-  @keyframes draw { from { stroke-dashoffset: var(--len); } to { stroke-dashoffset: 0; } }
   .fade-up { animation: viewIn .5s var(--ease) both; }
   .credit-amt { font-weight: 700; color: var(--accent); }
   .actions { display: grid; gap: 10px; margin-top: 24px; }
@@ -58,7 +58,8 @@
   @media (max-width: 360px) { .big { font-size: 44px; } }
 </style>
 </head>
-<body>
+<body class="app-scroll">
+<div class="scroller" id="scroller">
 
 <header class="appbar" id="appbar">
   <div class="appbar-row">
@@ -82,8 +83,8 @@
       <div class="big" aria-live="polite"><span id="bigNum">0</span><span class="unit" id="bigUnit">days</span></div>
       <div class="sub-hours" id="subHours"></div>
       <div class="delta" id="delta"></div>
-      <div class="chart-wrap" id="chart" role="img" aria-label="Balance over time. Drag to see any date."></div>
-      <div class="chart-labels"><span id="lblStart"></span><span>Today</span><span id="lblEnd"></span></div>
+      <div class="chart-wrap" id="chart" role="img" aria-label="Balance at the end of each month. Tap or drag to see a month."></div>
+      <div class="chart-labels"><span id="lblStart"></span><span>Tap or drag a month</span><span id="lblEnd"></span></div>
     </div>
 
     <div class="actions"><button class="btn" id="logBtn">Log time off</button></div>
@@ -161,12 +162,12 @@
       <button class="btn secondary" id="setupImport">Restore from a backup file</button></div>
   </section>
 </main>
+</div>
 
 <input type="file" id="importFile" accept="application/json,.json" hidden>
 
 <div class="scrim" id="scrim" hidden></div>
 <div class="sheet" id="sheet" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" hidden>
-  <div class="sheet-grip"></div>
   <div class="sheet-head">
     <button class="icon-btn" id="sheetCancel">Cancel</button>
     <h2 id="sheetTitle"></h2>
