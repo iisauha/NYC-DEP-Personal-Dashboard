@@ -99,8 +99,8 @@ body.app-scroll { height: 100dvh; overflow: hidden; }
 }
 .appbar.scrolled { border-bottom-color: var(--line); }
 .appbar-row { display: flex; align-items: center; min-height: var(--tap); max-width: 640px; margin: 0 auto; }
-.appbar-title { font-size: 17px; font-weight: 700; flex: 1; min-width: 0; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0; transform: translateY(4px); transition: opacity .2s, transform .2s var(--ease); }
-.appbar.scrolled .appbar-title { opacity: 1; transform: none; }
+.appbar-title { font-size: 17px; font-weight: 700; flex: 1; min-width: 0; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0; transition: opacity .2s; }
+.appbar.scrolled .appbar-title { opacity: 1; }
 .appbar-side { flex: 0 0 96px; display: flex; }
 .appbar-side.end { justify-content: flex-end; }
 .large-title { font-size: 34px; line-height: 1.1; font-weight: 800; letter-spacing: -.02em; margin: 6px 0 18px; }
@@ -108,10 +108,10 @@ body.app-scroll { height: 100dvh; overflow: hidden; }
 .icon-btn {
   min-width: var(--tap); height: var(--tap); padding: 0 10px; border: 0; border-radius: 22px;
   background: transparent; color: var(--ink); display: inline-flex; align-items: center; justify-content: center; gap: 2px;
-  cursor: pointer; font-size: 16px; font-weight: 600; transition: transform .15s var(--ease), background-color .15s;
+  cursor: pointer; font-size: 16px; font-weight: 600; transition: background-color .15s;
 }
-.icon-btn svg { width: 24px; height: 24px; }
-.icon-btn:active { transform: scale(.92); background: var(--fill); }
+.icon-btn svg { width: 24px; height: 24px; display: block; flex: 0 0 auto; }
+.icon-btn:active { background: var(--fill); }
 
 /* ---------- Page ---------- */
 .page {
