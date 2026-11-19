@@ -38,14 +38,9 @@
   .annual { --c: var(--annual); } .sick { --c: var(--sick); }
 
   .chart { position: relative; margin: 22px calc(-1 * var(--gutter)) 0; }
-  .grid { position: absolute; left: var(--gutter); right: var(--gutter); top: 0; height: 220px; pointer-events: none; }
-  .gl { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--line); }
-  .gl::after { content: ""; position: absolute; right: 0; width: 44px; top: -1px; border-top: 1px solid var(--bg); }
-  .gl span { position: absolute; right: 0; top: -7px; width: 40px; text-align: right; font-size: 11px; font-weight: 700; color: var(--ink-3); line-height: 1; }
-  .gl.base { border-top-style: solid; }
-  .bar-scroll { position: relative; overflow-x: auto; overflow-y: hidden; padding: 0 0 0 var(--gutter); margin-right: calc(var(--gutter) + 46px); scrollbar-width: none; -webkit-overflow-scrolling: touch;
-    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 16px, #000 calc(100% - 24px), transparent 100%);
-            mask-image: linear-gradient(90deg, transparent 0, #000 16px, #000 calc(100% - 24px), transparent 100%); }
+  .bar-scroll { position: relative; overflow-x: auto; overflow-y: hidden; padding: 0 var(--gutter); scrollbar-width: none; -webkit-overflow-scrolling: touch;
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 16px, #000 calc(100% - 16px), transparent 100%);
+            mask-image: linear-gradient(90deg, transparent 0, #000 16px, #000 calc(100% - 16px), transparent 100%); }
   .bar-scroll::-webkit-scrollbar { display: none; }
   .bars { display: flex; gap: 6px; width: max-content; padding-right: 20px; }
   .bar-col { flex: 0 0 40px; display: flex; flex-direction: column; align-items: center; border: 0; background: none; padding: 0; cursor: pointer; color: inherit; font: inherit; }
@@ -59,7 +54,7 @@
   .bar-col.future .seg { background-image: repeating-linear-gradient(135deg, rgba(0,0,0,.28) 0 3px, transparent 3px 8px); }
   /* when a bar is picked, fade the others a little */
   .picking .bar-col:not(.sel) .bar-fill { opacity: .35; }
-  .bar-lbl { font-size: 11px; font-weight: 700; color: var(--ink-3); line-height: 1.2; text-align: center; height: 42px; padding-top: 8px; }
+  .bar-lbl { font-size: 11px; font-weight: 700; color: var(--ink-3); line-height: 1.25; text-align: center; min-height: 58px; padding-top: 8px; }
   .bar-lbl b { display: block; font-size: 13px; color: var(--ink-2); }
   .bar-lbl em { display: block; font-style: normal; font-size: 10px; color: var(--ink-3); }
   .bar-col.now .bar-lbl, .bar-col.sel .bar-lbl, .bar-col.now .bar-lbl b, .bar-col.sel .bar-lbl b { color: var(--ink); }

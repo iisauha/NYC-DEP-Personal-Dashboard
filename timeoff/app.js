@@ -139,7 +139,6 @@ function renderHome(animate) {
 /* ---------- chart: stacked bars (sick bottom, annual top) on one fixed scale ---------- */
 let chart = null, selIdx = null;
 const BAR_H = 220;                       // px height of the bar area; every bar uses this same scale
-function niceStep(maxDays) { for (const s of [1, 2, 5, 10, 20, 25, 50]) if (maxDays / s <= 5) return s; return 100; }
 function drawChart(animate) {
   const wrap = $('chart'); if (!wrap) return;
   const t = L.today(), end = L.iso(L.addDays(L.parse(t), 190));   // about 6 months ahead
@@ -153,15 +152,10 @@ function drawChart(animate) {
   // one scale for the whole chart, rounded up to a clean number of days
   const maxTotal = Math.max(S.dayMins, ...items.map(i => i.a + i.s));
   const topMins = maxTotal * 1.06;
-  const step = niceStep(topMins / S.dayMins);
   const scale = BAR_H / topMins;                     // px per minute, same for every bar
   const px = m => Math.round(m * scale);
-  let grid = '<div class="gl base" style="bottom:0"></div>';
-  for (let d = step; d * S.dayMins <= topMins; d += step)
-    grid += `<div class="gl" style="bottom:${Math.round(d * S.dayMins * scale)}px"><span>${d}d</span></div>`;
   let prevYear = null;
-  wrap.innerHTML = `<div class="grid" aria-hidden="true">${grid}</div>
-    <div class="bar-scroll" id="barScroll"><div class="bars">${items.map((it, i) => {
+  wrap.innerHTML = `<div class="bar-scroll" id="barScroll"><div class="bars">${items.map((it, i) => {
     const d = L.parse(it.date), y = d.getFullYear(), showY = prevYear !== null && y !== prevYear; prevYear = y;
     const total = px(it.a + it.s), sick = px(it.s), annual = total - sick;
     return `<button class="bar-col${it.future ? ' future' : ''}${it.now ? ' now' : ''}${it.use ? ' use' : ''}" data-i="${i}" aria-label="${L.fmtDate(it.date)}: ${L.fmtHM(it.a)} annual, ${L.fmtHM(it.s)} sick">
