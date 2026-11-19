@@ -126,7 +126,7 @@ function renderHome(animate) {
   const last = L.lastCredit(S, t), next = L.nextCredit(S, t);
   const row = (label, c, est) => c ? `<div class="row"><span class="badge-icon ${leaveType}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 6v12M6 12h12"/></svg></span>
       <div class="row-main"><div class="row-title">${label}</div>
-      <div class="row-sub">${dShort(c.date)}, ${mName(c.ym)} hours${est ? ' (estimated)' : ''}</div></div>
+      <div class="row-sub">${dShort(c.date)}, ${mName(c.ym)} hours</div></div>
       <div class="row-value credit-amt">+${L.fmtHM(c[leaveType])}</div></div>` : '';
   $('credits').innerHTML = (row('Last added', last) + row('Next', next, next && L.postSource(S, next.ym) === 'estimated'))
     || '<div class="empty">Add your monthly hours in Settings.</div>';
@@ -414,7 +414,7 @@ function renderDates() {
   let ym = S.startDate.slice(0, 7), end = `${thisYear + 1}-12`, html = '';
   for (let i = 0; i < 120 && ym <= end; i++) {
     const pd = L.postDate(S, ym), src = L.postSource(S, ym);
-    const tag = pd <= t ? ['counted', 'Added'] : src === 'edited' ? ['edited', 'Edited'] : L.delayed(ym) ? ['est', 'Payroll weekend'] : src === 'official' ? ['official', 'Official'] : ['est', 'Estimated'];
+    const tag = pd <= t ? ['counted', 'Added'] : src === 'edited' ? ['edited', 'Edited'] : ['est', 'Expected'];
     html += `<div class="field"${pd <= t ? ' style="opacity:.6"' : ''}><div class="label">${L.parse(ym + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })} hours
       <div><span class="pill ${tag[0]}">${tag[1]}</span></div></div>
       <input type="date" data-ym="${ym}" value="${pd}" aria-label="Date ${mLong(ym)} hours get added"></div>`;
