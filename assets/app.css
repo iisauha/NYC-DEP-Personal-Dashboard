@@ -1,38 +1,59 @@
 /* NYC DEP Personal Dashboard: shared design tokens and components.
    Flat, high-contrast, one accent at a time. Light by default; dark via data-theme. */
+/* Light, "mineral": soft gray-green page instead of stark white; pure white only for raised layers
+   (sheets, inputs) so the eye has a bright anchor. Text is softened near-black. */
 :root, :root[data-theme="light"] {
   color-scheme: light;
-  --bg: #ffffff;
-  --ink: #0f1214;
-  --ink-2: #5f676d;
-  --ink-3: #8b9399;
-  --line: #e8ebed;
-  --fill: #f2f4f5;           /* inputs, segmented track, pressed rows */
-  --annual: #00a86b;         /* green */
-  --sick: #5b5bd6;           /* indigo */
+  --bg: #f2f4f1;
+  --surface: #ffffff;         /* raised: sheets, segmented thumb, inputs */
+  --ink: #1b2320;
+  --ink-2: #56615c;           /* 6.0:1 on --bg */
+  --ink-3: #6a7570;
+  --line: #dfe4df;
+  --fill: #e7ebe6;            /* fields, tracks, pressed rows */
+  --annual: #127a4b;          /* deep green: 4.9:1 as text, 5.4:1 under white button text */
+  --sick: #5753c4;
   --accent: var(--annual);
   --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
   --on-accent: #ffffff;
-  --warn: #b25e00;
-  --danger: #e5484d;
-  --scrim: rgba(15, 18, 20, .32);
-  --bar: rgba(255, 255, 255, .88);
-  --shadow: 0 10px 30px rgba(15, 18, 20, .12);
+  --warn: #9a5a0b;
+  --danger: #c43d3d;
+  --scrim: rgba(27, 35, 32, .28);
+  --bar: rgba(242, 244, 241, .86);
+  --shadow: 0 12px 32px rgba(27, 35, 32, .12);
 }
 :root[data-theme="dark"] {
-  color-scheme: dark;
-  --bg: #000000; --ink: #f4f6f7; --ink-2: #9aa3a9; --ink-3: #6c757b; --line: #1f2427; --fill: #15191b;
-  --annual: #1fd88a; --sick: #8b8bf5; --on-accent: #000000;
-  --warn: #f0b04d; --danger: #ff6369; --scrim: rgba(0, 0, 0, .6); --bar: rgba(0, 0, 0, .82);
-  --shadow: 0 10px 30px rgba(0, 0, 0, .5);
+    color-scheme: dark;
+    --bg: #15191b;            /* cool slate, not black */
+    --surface: #1f2528;       /* raised layers are lighter, not shadowed */
+    --ink: #e5eae7;           /* off-white, about 87% */
+    --ink-2: #a2aca8;
+    --ink-3: #75807c;
+    --line: #2b3236;
+    --fill: #252c2f;
+    --annual: #62c99c;        /* softer mint, desaturated so it doesn't glow */
+    --sick: #a6a3ef;          /* soft lavender */
+    --on-accent: #10201a;
+    --warn: #e9b46a; --danger: #ef8a84;
+    --scrim: rgba(5, 8, 9, .55); --bar: rgba(21, 25, 27, .86);
+    --shadow: 0 12px 32px rgba(0, 0, 0, .35);
 }
 @media (prefers-color-scheme: dark) {
   :root[data-theme="auto"] {
-    color-scheme: dark;
-    --bg: #000000; --ink: #f4f6f7; --ink-2: #9aa3a9; --ink-3: #6c757b; --line: #1f2427; --fill: #15191b;
-    --annual: #1fd88a; --sick: #8b8bf5; --on-accent: #000000;
-    --warn: #f0b04d; --danger: #ff6369; --scrim: rgba(0, 0, 0, .6); --bar: rgba(0, 0, 0, .82);
-    --shadow: 0 10px 30px rgba(0, 0, 0, .5);
+      color-scheme: dark;
+      --bg: #15191b;            /* cool slate, not black */
+      --surface: #1f2528;       /* raised layers are lighter, not shadowed */
+      --ink: #e5eae7;           /* off-white, about 87% */
+      --ink-2: #a2aca8;
+      --ink-3: #75807c;
+      --line: #2b3236;
+      --fill: #252c2f;
+      --annual: #62c99c;        /* softer mint, desaturated so it doesn't glow */
+      --sick: #a6a3ef;          /* soft lavender */
+      --on-accent: #10201a;
+      --warn: #e9b46a; --danger: #ef8a84;
+      --scrim: rgba(5, 8, 9, .55); --bar: rgba(21, 25, 27, .86);
+      --shadow: 0 12px 32px rgba(0, 0, 0, .35);
   }
 }
 :root {
@@ -165,7 +186,7 @@ input:focus { outline: 2px solid var(--accent); outline-offset: 0; }
 /* Segmented control with a sliding thumb */
 .segmented { position: relative; display: flex; background: var(--fill); border-radius: 999px; padding: 4px; }
 .segmented .thumb {
-  position: absolute; top: 4px; bottom: 4px; left: 4px; border-radius: 999px; background: var(--bg);
+  position: absolute; top: 4px; bottom: 4px; left: 4px; border-radius: 999px; background: var(--surface);
   box-shadow: 0 1px 4px rgba(0, 0, 0, .12); transition: transform .35s var(--spring), width .35s var(--spring);
 }
 .segmented button {
@@ -186,7 +207,7 @@ input:focus { outline: 2px solid var(--accent); outline-offset: 0; }
 .scrim.open { opacity: 1; }
 .sheet {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 41; max-height: calc(100dvh - var(--safe-t) - 24px);
-  background: var(--bg); border-radius: 24px 24px 0 0; overflow-y: auto; box-shadow: var(--shadow);
+  background: var(--surface); border-radius: 24px 24px 0 0; overflow-y: auto; box-shadow: var(--shadow);
   padding: 0 calc(var(--gutter) + var(--safe-r)) calc(24px + var(--safe-b)) calc(var(--gutter) + var(--safe-l));
   transform: translateY(100%); transition: transform .42s cubic-bezier(.22, 1.2, .36, 1);
   max-width: 560px; margin: 0 auto;

@@ -64,7 +64,7 @@ function applyTheme() {
   const t = S.theme || 'light';
   document.documentElement.dataset.theme = t;
   const dark = t === 'dark' || (t === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
-  const tc = document.getElementById('themeColor'); if (tc) tc.content = dark ? '#000000' : '#ffffff';
+  const tc = document.getElementById('themeColor'); if (tc) tc.content = dark ? '#15191b' : '#f2f4f1';
   const sb = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
   if (sb) sb.content = dark ? 'black-translucent' : 'default';
   const g = $('themeToggle');
