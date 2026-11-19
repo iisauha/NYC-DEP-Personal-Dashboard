@@ -117,16 +117,20 @@ function renderHome(animate) {
       <div class="row-value"><span style="color:var(--annual)">+${L.fmtHM(c.annual)}</span><small><span style="color:var(--sick);font-weight:600">+${L.fmtHM(c.sick)}</span></small></div></div>` : '';
   $('credits').innerHTML = (row('Next deposit', next, true) + row('Last deposit', last)) || '<div class="empty">Add your monthly hours in Settings.</div>';
 
-  const uses = [...S.uses].sort((x, y) => y.date.localeCompare(x.date));
+  const groups = groupUses();
   let counted = false;
-  $('taken').innerHTML = uses.length ? uses.map(u => {
-    const tag = u.date > t ? '<span class="pill planned">Planned</span>'
-      : u.date <= S.anchor.date ? (counted = true, '<span class="pill counted">In CityTime</span>') : '';
-    return `<li><button class="row" data-use="${u.id}">
-      <span class="badge-icon ${u.type}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 12h12"/></svg></span>
-      <div class="row-main"><div class="row-title">${dShort(u.date)} ${tag}</div>
-      <div class="row-sub">${NAME[u.type]}${u.note ? ', ' + esc(u.note) : ''}</div></div>
-      <div class="row-value" style="color:var(--${u.type})">−${L.fmtHM(u.mins)}<small>${days(u.mins)} ${dayWord(u.mins)}</small></div></button></li>`;
+  $('taken').innerHTML = groups.length ? groups.map(g => {
+    const first = g.items[0], last = g.items[g.items.length - 1];
+    const tag = first.date > t ? '<span class="pill planned">Planned</span>'
+      : last.date <= S.anchor.date ? (counted = true, '<span class="pill counted">In CityTime</span>') : '';
+    const when = g.items.length > 1 ? `${dShort(first.date)} to ${dShort(last.date)}` : dShort(first.date);
+    const span = first.start && first.end ? `, ${fmtTime(first.start)} to ${fmtTime(first.end)}` : '';
+    const n = g.items.length;
+    return `<li><button class="row" data-use="${first.id}">
+      <span class="badge-icon ${first.type}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 12h12"/></svg></span>
+      <div class="row-main"><div class="row-title">${when} ${tag}</div>
+      <div class="row-sub">${NAME[first.type]}${n > 1 ? `, ${n} days` : ''}${span}${first.note ? ', ' + esc(first.note) : ''}</div></div>
+      <div class="row-value" style="color:var(--${first.type})">−${L.fmtHM(g.mins)}<small>${days(g.mins)} ${dayWord(g.mins)}</small></div></button></li>`;
   }).join('') : '<li class="empty">Nothing logged yet.</li>';
   $('takenFoot').hidden = !counted;
   $('takenFoot').textContent = `"In CityTime" means it's on or before ${dShort(S.anchor.date)}, the date of your balance, so it isn't subtracted again.`;
@@ -141,7 +145,7 @@ function drawChart(animate) {
   const dates = new Set([t]);
   let ym = S.startDate.slice(0, 7);
   for (let i = 0; i < 400; i++) { const pd = L.postDate(S, ym); if (pd > end) break; if (L.rateFor(S, ym) && pd >= S.startDate) dates.add(pd); ym = L.nextMonth(ym); }
-  for (const u of S.uses) if (u.date >= S.startDate && u.date <= end) dates.add(u.date);
+  for (const g of groupUses()) { const d = g.items[g.items.length - 1].date; if (d >= S.startDate && d <= end) dates.add(d); }
   const items = [...dates].sort().map(d => ({ date: d, a: L.valueAt(pa, d), s: L.valueAt(ps, d), now: d === t, future: d > t,
     use: S.uses.some(u => u.date === d) }));
   const max = Math.max(S.dayMins, ...items.map(i => Math.max(i.a, i.s)));
@@ -217,60 +221,127 @@ $('scrim').addEventListener('click', closeSheet);
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('sheet').hidden) closeSheet(); });
 
 /* ---------- log / edit time off ---------- */
+/* Entries are stored one per day; days logged together share a `group` id. */
+function groupUses() {
+  const map = new Map();
+  for (const u of [...S.uses].sort((x, y) => x.date.localeCompare(y.date))) {
+    const k = u.group || u.id;
+    if (!map.has(k)) map.set(k, { key: k, items: [], mins: 0 });
+    const g = map.get(k); g.items.push(u); g.mins += u.mins;
+  }
+  return [...map.values()].sort((x, y) => y.items[0].date.localeCompare(x.items[0].date));
+}
+const toMin = hhmm => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
+function fmtTime(hhmm) { const [h, m] = hhmm.split(':').map(Number); return `${(h % 12) || 12}${m ? ':' + String(m).padStart(2, '0') : ''} ${h < 12 ? 'AM' : 'PM'}`; }
+const isWeekend = d => { const w = L.parse(d).getDay(); return w === 0 || w === 6; };
+function datesBetween(a, b) { const out = []; for (let d = a; d <= b && out.length < 120; d = L.iso(L.addDays(L.parse(d), 1))) out.push(d); return out; }
+
 function openTimeOff(u) {
-  const editing = !!u;
-  let type = u ? u.type : 'annual';
+  const group = u ? S.uses.filter(x => (x.group || x.id) === (u.group || u.id)).sort((x, y) => x.date.localeCompare(y.date)) : [];
+  const editing = group.length > 0;
+  let type = editing ? group[0].type : 'annual';
+  const from0 = editing ? group[0].date : L.today(), to0 = editing ? group[group.length - 1].date : from0;
+  let excluded = new Set();                                   // weekdays the user tapped off
+  let included = new Set();                                   // weekend days the user tapped on
+  if (editing) for (const d of datesBetween(from0, to0)) {
+    const has = group.some(x => x.date === d);
+    if (!has && !isWeekend(d)) excluded.add(d);
+    if (has && isWeekend(d)) included.add(d);
+  }
   openSheet(editing ? 'Edit time off' : 'Log time off', `
-    <div class="segmented" role="group" aria-label="Type" id="tType" style="margin-bottom:14px"><span class="thumb" aria-hidden="true"></span>
+    <div class="segmented" role="group" aria-label="Type" id="tType" style="margin-bottom:6px"><span class="thumb" aria-hidden="true"></span>
       <button aria-pressed="${type === 'annual'}" data-t="annual">Annual</button><button aria-pressed="${type === 'sick'}" data-t="sick">Sick</button></div>
     <div class="list">
-      <div class="field"><label for="tDate">Date</label><input type="date" id="tDate" value="${u ? u.date : L.today()}"></div>
-      <div class="field"><span class="label">Time off</span>${durHTML('tHrs', u ? u.mins : S.dayMins)}</div>
-      <div class="chips" style="padding-top:2px"><button class="chip" data-q="${S.dayMins}">Full day</button><button class="chip" data-q="${Math.round(S.dayMins / 2)}">Half day</button><button class="chip" data-q="60">1 hour</button></div>
+      <div class="field"><label for="tFrom">From</label><input type="date" id="tFrom" value="${from0}"></div>
+      <div class="field"><label for="tTo">To</label><input type="date" id="tTo" value="${to0}"></div>
     </div>
-    <div class="list" style="margin-top:12px"><div class="field"><input type="text" id="tNote" placeholder="Note (optional)" maxlength="80" aria-label="Note" value="${u ? esc(u.note) : ''}"></div></div>
-    <p class="note" id="tPrev"></p>
+    <div class="days-picked" id="tDays" aria-label="Days counted"></div>
+    <div class="list">
+      <div class="field"><label for="tStart">Start time</label><span class="time-wrap"><input type="time" id="tStart" value="${editing && group[0].start ? group[0].start : ''}"><button class="clear-x" data-clear="tStart" aria-label="Clear start time">×</button></span></div>
+      <div class="field"><label for="tEnd">End time</label><span class="time-wrap"><input type="time" id="tEnd" value="${editing && group[0].end ? group[0].end : ''}"><button class="clear-x" data-clear="tEnd" aria-label="Clear end time">×</button></span></div>
+    </div>
+    <p class="note" style="margin-top:4px">Leave the times blank for full days.</p>
+    <div class="list" style="margin-top:8px"><div class="field"><input type="text" id="tNote" placeholder="Note (optional)" maxlength="80" aria-label="Note" value="${editing ? esc(group[0].note) : ''}"></div></div>
+    <div class="summary" id="tSum"></div>
     <div class="actions"><button class="btn" id="tSave">${editing ? 'Save changes' : 'Log time off'}</button>
       ${editing ? '<button class="btn secondary" id="tDel" style="color:var(--danger)">Delete</button>' : ''}</div>`, body => {
-    const prev = () => {
-      const date = $('tDate').value || L.today(), mins = readDur('tHrs');
-      const others = S.uses.filter(x => x !== u);
-      const dup = others.find(x => x.date === date && x.type === type);
+
+    const counted = () => {
+      let a = $('tFrom').value, b = $('tTo').value || a;
+      if (!a) return [];
+      if (b < a) b = a;
+      return datesBetween(a, b).filter(d => isWeekend(d) ? included.has(d) : !excluded.has(d));
+    };
+    const perDay = () => {
+      const st = $('tStart').value, en = $('tEnd').value;
+      if (!st && !en) return { mins: S.dayMins, full: true };
+      if (!st || !en) return { mins: 0, err: 'Add both a start and an end time, or clear both for full days.' };
+      const m = toMin(en) - toMin(st);
+      if (m <= 0) return { mins: 0, err: 'End time needs to be after start time.' };
+      return { mins: Math.min(m, S.dayMins), full: false, capped: m > S.dayMins };
+    };
+    const render = () => {
+      let a = $('tFrom').value, b = $('tTo').value;
+      if (a && b && b < a) { $('tTo').value = a; b = a; }
+      const all = a ? datesBetween(a, b || a) : [];
+      const ds = new Set(counted());
+      $('tDays').innerHTML = all.length > 1 ? all.map(d => {
+        const dd = L.parse(d), on = ds.has(d);
+        return `<button class="day-chip${on ? ' on' : ''}${isWeekend(d) ? ' wknd' : ''}" data-day="${d}" aria-pressed="${on}">
+          <span>${dd.toLocaleDateString('en-US', { weekday: 'short' })}</span><b>${dd.getDate()}</b></button>`;
+      }).join('') : '';
+      const pd = perDay(), list = [...ds], total = pd.mins * list.length;
       let html;
-      if (date <= S.anchor.date) {
-        html = `This is on or before ${dShort(S.anchor.date)}, the date of your CityTime balance, so it's already counted there. It's saved for your records but not subtracted again.`;
-      } else {
-        const saved = S.uses; S.uses = others;
-        const before = L.balanceOn(S, date)[type]; S.uses = saved;
-        const after = before - mins;
-        html = `${NAME[type]} left after this: <strong class="${after < 0 ? 'neg' : ''}">${days(after)} ${dayWord(after)} (${L.fmtHM(after)})</strong>` +
-          (after < 0 ? '. That\'s more than you\'ll have on that date.' : '');
+      if (pd.err) html = `<span style="color:var(--warn)">${pd.err}</span>`;
+      else if (!list.length) html = `<span style="color:var(--warn)">No workdays picked.</span>`;
+      else {
+        const times = `${fmtTime($('tStart').value)} to ${fmtTime($('tEnd').value)}`;
+        const per = pd.full ? (list.length > 1 ? `${list.length} full days` : 'Full day')
+          : (list.length > 1 ? `${list.length} days, ${times}` : times);
+        html = `<div class="sum-big">${L.fmtHM(total)}<span>${per}</span></div>`;
+        const lastDay = list[list.length - 1];
+        if (lastDay <= S.anchor.date) html += `<div class="sum-sub">Before your balance date, so it's saved but not subtracted again.</div>`;
+        else {
+          const saved = S.uses; S.uses = S.uses.filter(x => !group.includes(x));
+          const before = L.balanceOn(S, lastDay)[type]; S.uses = saved;
+          const already = list.filter(d => d <= S.anchor.date).length * pd.mins;
+          const after = before - (total - already);
+          html += `<div class="sum-sub">${NAME[type]} left after: <strong class="${after < 0 ? 'neg' : ''}">${days(after)} ${dayWord(after)} (${L.fmtHM(after)})</strong>${after < 0 ? ', more than you\'ll have' : ''}</div>`;
+        }
+        const clash = S.uses.filter(x => !group.includes(x) && x.type === type && ds.has(x.date));
+        if (clash.length) html += `<div class="sum-sub" style="color:var(--warn)">You already logged ${type} leave on ${clash.map(x => dShort(x.date)).join(', ')}.</div>`;
+        if (pd.capped) html += `<div class="sum-sub">Capped at a ${L.fmtHM(S.dayMins)} workday.</div>`;
       }
-      if (dup) html += `<br><span style="color:var(--warn)">You already logged ${L.fmtHM(dup.mins)} of ${type} leave on this date.</span>`;
-      $('tPrev').innerHTML = html;
-      $('tSave').disabled = mins <= 0;
+      $('tSum').innerHTML = html;
+      $('tSave').disabled = !!pd.err || !list.length;
     };
     requestAnimationFrame(() => placeThumb($('tType')));
-    $('tType').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; type = b.dataset.t;
-      pressOne($('tType'), b); prev(); });
-    body.querySelector('.chips').addEventListener('click', e => { if (e.target.dataset.q) { setDur('tHrs', +e.target.dataset.q); prev(); } });
-    body.addEventListener('input', prev);
+    $('tType').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; type = b.dataset.t; pressOne($('tType'), b); render(); });
+    $('tFrom').addEventListener('change', () => { if (!$('tTo').value || $('tTo').value < $('tFrom').value) $('tTo').value = $('tFrom').value; render(); });
+    $('tDays').addEventListener('click', e => {
+      const c = e.target.closest('[data-day]'); if (!c) return; const d = c.dataset.day;
+      if (isWeekend(d)) included.has(d) ? included.delete(d) : included.add(d);
+      else excluded.has(d) ? excluded.delete(d) : excluded.add(d);
+      render();
+    });
+    body.addEventListener('click', e => { const c = e.target.closest('[data-clear]'); if (c) { $(c.dataset.clear).value = ''; render(); } });
+    body.addEventListener('input', render);
+    body.addEventListener('change', render);
+
     $('tSave').addEventListener('click', () => {
-      const mins = readDur('tHrs'), date = $('tDate').value; if (!date || mins <= 0) return;
-      const data = { date, type, mins, note: $('tNote').value.trim() };
-      if (editing) {
-        const old = { ...u }; Object.assign(u, data); persist(); closeSheet(); refresh();
-        snack('Changes saved', () => { Object.assign(u, old); persist(); refresh(); });
-      } else {
-        const n = { id: newId(), ...data }; S.uses.push(n); persist(); closeSheet(); refresh();
-        snack('Time off logged', () => { S.uses = S.uses.filter(x => x !== n); persist(); refresh(); });
-      }
+      const pd = perDay(), list = counted(); if (pd.err || !list.length) return;
+      const g = list.length > 1 ? newId() : undefined, st = $('tStart').value, en = $('tEnd').value, note = $('tNote').value.trim();
+      const made = list.map(d => ({ id: newId(), date: d, type, mins: pd.mins, note, ...(g ? { group: g } : {}), ...(st && en ? { start: st, end: en } : {}) }));
+      const old = group;
+      S.uses = S.uses.filter(x => !old.includes(x)).concat(made);
+      persist(); closeSheet(); refresh();
+      snack(editing ? 'Changes saved' : `${L.fmtHM(pd.mins * list.length)} logged`, () => { S.uses = S.uses.filter(x => !made.includes(x)).concat(old); persist(); refresh(); });
     });
     if (editing) $('tDel').addEventListener('click', () => {
-      const i = S.uses.indexOf(u); S.uses.splice(i, 1); persist(); closeSheet(); refresh();
-      snack('Deleted', () => { S.uses.splice(i, 0, u); persist(); refresh(); });
+      S.uses = S.uses.filter(x => !group.includes(x)); persist(); closeSheet(); refresh();
+      snack('Deleted', () => { S.uses = S.uses.concat(group); persist(); refresh(); });
     });
-    prev();
+    render();
   });
 }
 $('logBtn').addEventListener('click', () => openTimeOff(null));
