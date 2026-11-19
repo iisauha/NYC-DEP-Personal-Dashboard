@@ -196,10 +196,10 @@ function endScrub() {
   wrap.querySelectorAll('.bar-col.sel').forEach(c => c.classList.remove('sel'));
   setBig(L.balanceOn(S, L.today())[leaveType], true); setDeltaDefault();
 }
-let scrubbing = false;
-$('chart').addEventListener('pointerdown', e => { scrubbing = true; $('chart').setPointerCapture(e.pointerId); scrubAt(e.clientX); });
+let scrubbing = false, releaseT = 0;
+$('chart').addEventListener('pointerdown', e => { clearTimeout(releaseT); scrubbing = true; $('chart').setPointerCapture(e.pointerId); scrubAt(e.clientX); });
 $('chart').addEventListener('pointermove', e => { if (scrubbing) scrubAt(e.clientX); });
-$('chart').addEventListener('pointerup', () => { scrubbing = false; setTimeout(endScrub, 900); });
+$('chart').addEventListener('pointerup', () => { scrubbing = false; clearTimeout(releaseT); releaseT = setTimeout(endScrub, 1500); });
 $('chart').addEventListener('pointercancel', () => { scrubbing = false; endScrub(); });
 window.addEventListener('resize', () => { if (view === 'home') drawChart(false); });
 
@@ -291,7 +291,9 @@ document.addEventListener('click', e => {
 const two = (a, s) => `<div class="row-value"><span style="color:var(--annual)">+${L.fmtHM(a)}</span> annual<small><span style="color:var(--sick);font-weight:600">+${L.fmtHM(s)}</span> sick</small></div>`;
 function renderSettings() {
   $('balTitle').innerHTML = `<span style="color:var(--annual);font-weight:600">${L.fmtHM(S.anchor.annual)}</span> annual, <span style="color:var(--sick);font-weight:600">${L.fmtHM(S.anchor.sick)}</span> sick`;
-  $('balSub').textContent = `As of ${L.fmtDate(S.anchor.date)}`;
+  const fromStart = S.anchor.date < S.startDate;
+  if (fromStart) { const b = L.balanceOn(S, L.today()); $('balTitle').innerHTML = `<span style="color:var(--annual);font-weight:600">${L.fmtHM(b.annual)}</span> annual, <span style="color:var(--sick);font-weight:600">${L.fmtHM(b.sick)}</span> sick`; }
+  $('balSub').textContent = fromStart ? `Calculated from your first day, ${L.fmtDate(S.startDate)}` : `As of ${L.fmtDate(S.anchor.date)}`;
   const rs = sortedRates(), nowYM = L.today().slice(0, 7), cur = L.rateFor(S, nowYM);
   $('rateList').innerHTML = rs.map((r, i) => {
     const nx = rs[i + 1];
@@ -314,7 +316,17 @@ $('openBalance').addEventListener('click', () => {
       <div class="field"><label for="uD">As of</label><input type="date" id="uD" value="${t}"></div>
     </div>
     <p class="note" id="uPrev"></p>
-    <div class="actions"><button class="btn" id="uSave">Save balance</button></div>`, body => {
+    <div class="actions"><button class="btn" id="uSave">Save balance</button>
+      <button class="btn secondary" id="uFromStart">Calculate from my first day</button></div>
+    <p class="note" id="uStartNote"></p>`, body => {
+    const fromStart = { date: L.iso(L.addDays(L.parse(S.startDate), -1)), annual: 0, sick: 0 };
+    { const saved = S.anchor; S.anchor = fromStart; const b = L.balanceOn(S, t); S.anchor = saved;
+      $('uStartNote').textContent = `Starts at zero on ${L.fmtDate(S.startDate)} and adds your monthly hours on each date, minus time off you logged. That gives ${L.fmtHM(b.annual)} annual and ${L.fmtHM(b.sick)} sick today.`; }
+    $('uFromStart').addEventListener('click', () => {
+      const old = { ...S.anchor }; S.anchor = fromStart;
+      persist(); closeSheet(); refresh();
+      snack('Calculated from your first day', () => { S.anchor = old; persist(); refresh(); });
+    });
     const prev = () => {
       const d = $('uD').value || t;
       const after = S.uses.filter(u => u.date > d);

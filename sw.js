@@ -1,6 +1,6 @@
 /* Offline support. Network first, so a new version shows up right away when online;
    falls back to the cached copy when offline. */
-const CACHE = 'dep-dashboard-v11';
+const CACHE = 'dep-dashboard-v12';
 const SHELL = [
   './', './index.html', './manifest.webmanifest', './assets/app.css',
   './timeoff/', './timeoff/index.html', './timeoff/app.js', './timeoff/leave.js',
