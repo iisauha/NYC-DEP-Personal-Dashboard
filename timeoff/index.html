@@ -42,11 +42,11 @@
     -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%);
             mask-image: linear-gradient(90deg, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%); }
   .chart-scroll::-webkit-scrollbar { display: none; }
-  .bars { display: flex; gap: 4px; height: 210px; width: max-content; padding-right: 8px; }
+  .bars { display: flex; gap: 4px; height: 240px; width: max-content; padding-right: 8px; }
   .bar-col { flex: 0 0 42px; display: flex; flex-direction: column; align-items: center; gap: 8px; border: 0; background: none; padding: 0; cursor: pointer; color: inherit; font: inherit; }
   .bar-stack { position: relative; flex: 1; width: 100%; }
-  .bar-fill { position: absolute; bottom: 0; left: 50%; width: 26px; margin-left: -13px; display: flex; flex-direction: column;
-    gap: 2px; border-radius: 7px 7px 3px 3px; overflow: hidden; transform-origin: bottom; transition: height .35s var(--ease), opacity .2s; opacity: .4; }
+  .bar-fill { position: absolute; bottom: 0; left: 50%; width: 30px; margin-left: -15px; display: flex; flex-direction: column;
+    gap: 2px; border-radius: 6px; overflow: hidden; transform-origin: bottom; transition: height .35s var(--ease), opacity .2s; opacity: .4; }
   .seg { flex: 1 1 0; min-height: 0; transition: flex-grow .35s var(--ease); }
   .seg.a { background: var(--annual); }
   .seg.s { background: var(--sick); }
@@ -98,7 +98,7 @@
     </div>
 
     <div class="chart-scroll" id="chart" aria-label="Balance on each deposit date. Swipe for more, tap a bar to see that date."></div>
-    <div class="chart-key"><span><i style="background:var(--annual)"></i>Annual</span><span><i style="background:var(--sick)"></i>Sick</span></div>
+    <div class="chart-key"><span><i style="background:var(--annual)"></i>Annual (top)</span><span><i style="background:var(--sick)"></i>Sick (bottom)</span></div>
     <p class="chart-hint">Swipe for more dates. Tap a bar to see that day.</p>
 
     <div class="actions"><button class="btn" id="logBtn">Log time off</button></div>

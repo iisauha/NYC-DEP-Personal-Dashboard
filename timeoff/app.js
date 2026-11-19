@@ -151,7 +151,7 @@ function drawChart(animate) {
     const h = v => Math.max(1.5, Math.max(0, v) / max * 100);
     return `<button class="bar-col${it.future ? ' future' : ''}${it.now ? ' now' : ''}${it.use ? ' use' : ''}" data-i="${i}" aria-label="${L.fmtDate(it.date)}">
       <span class="bar-stack"><span class="bar-fill${animate ? ' grow' : ''}" style="animation-delay:${Math.min(i, 20) * 25}ms">
-        <span class="seg s"></span><span class="seg a"></span></span></span>
+        <span class="seg a"></span><span class="seg s"></span></span></span>
       <span class="bar-lbl">${it.now ? 'Today' : d.toLocaleDateString('en-US', { month: 'short' })}<b>${it.now ? '&nbsp;' : d.getDate()}</b>${showY ? `<em>${y}</em>` : ''}</span>
     </button>`;
   }).join('')}</div>`;
@@ -171,7 +171,7 @@ function rescale() {
   const cols = wrap.querySelectorAll('.bar-col');
   let max = S.dayMins;
   cols.forEach((c, i) => { if (c.offsetLeft + c.offsetWidth > left && c.offsetLeft < right) max = Math.max(max, Math.max(0, chart.items[i].a) + Math.max(0, chart.items[i].s)); });
-  max *= 1.08;
+  max *= 1.03;
   cols.forEach((c, i) => {
     const it = chart.items[i], a = Math.max(0, it.a), sk = Math.max(0, it.s), tot = a + sk;
     const fill = c.querySelector('.bar-fill');
