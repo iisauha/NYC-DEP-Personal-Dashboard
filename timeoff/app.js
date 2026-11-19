@@ -144,7 +144,7 @@ function drawChart(animate) {
   const wrap = $('chart'); if (!wrap) return;
   const t = L.today(), end = L.iso(L.addDays(L.parse(t), 190));   // about 6 months ahead
   const pa = L.series(S, 'annual', end), ps = L.series(S, 'sick', end);
-  const dates = new Set([t]);
+  const dates = new Set();
   let ym = S.startDate.slice(0, 7);
   for (let i = 0; i < 400; i++) { const pd = L.postDate(S, ym); if (pd > end) break; if (L.rateFor(S, ym) && pd >= S.startDate) dates.add(pd); ym = L.nextMonth(ym); }
   for (const g of groupUses()) { const d = g.items[g.items.length - 1].date; if (d >= S.startDate && d <= end) dates.add(d); }
@@ -172,14 +172,15 @@ function drawChart(animate) {
   }).join('')}</div></div>`;
   chart = { items, pa, ps };
   selIdx = null;
-  const sc = $('barScroll'), nowEl = sc.querySelector('.bar-col.now');
-  if (nowEl) sc.scrollLeft = Math.max(0, nowEl.offsetLeft - sc.clientWidth * 0.6);
+  // open with the latest past deposit in view
+  const sc = $('barScroll'), past = [...sc.querySelectorAll('.bar-col:not(.future)')], lastPast = past[past.length - 1];
+  if (lastPast) sc.scrollLeft = Math.max(0, lastPast.offsetLeft - sc.clientWidth * 0.55);
 }
 $('chart').addEventListener('click', e => {
   const col = e.target.closest('.bar-col'); if (!col) return;
   const i = +col.dataset.i, it = chart.items[i];
   const cols = $('chart').querySelectorAll('.bar-col');
-  if (selIdx === i || it.now) {
+  if (selIdx === i) {
     selIdx = null; cols.forEach(c => c.classList.remove('sel')); $('chart').classList.remove('picking');
     showDate(L.today(), todayLabel()); return;
   }
