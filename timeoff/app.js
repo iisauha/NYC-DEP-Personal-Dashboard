@@ -149,8 +149,8 @@ function drawChart(animate) {
     const d = L.parse(it.date), y = d.getFullYear(), showY = prevYear !== null && y !== prevYear; prevYear = y;
     const h = v => Math.max(1.5, Math.max(0, v) / max * 100);
     return `<button class="bar-col${it.future ? ' future' : ''}${it.now ? ' now' : ''}${it.use ? ' use' : ''}" data-i="${i}" aria-label="${L.fmtDate(it.date)}">
-      <span class="bar-stack"><span class="bar a${animate ? ' grow' : ''}" style="height:${h(it.a)}%;animation-delay:${Math.min(i, 20) * 25}ms"></span>
-      <span class="bar s${animate ? ' grow' : ''}" style="height:${h(it.s)}%;animation-delay:${Math.min(i, 20) * 25 + 60}ms"></span></span>
+      <span class="bar-stack"><span class="bar-fill${animate ? ' grow' : ''}" style="animation-delay:${Math.min(i, 20) * 25}ms">
+        <span class="seg s"></span><span class="seg a"></span></span></span>
       <span class="bar-lbl">${it.now ? 'Today' : d.toLocaleDateString('en-US', { month: 'short' })}<b>${it.now ? '&nbsp;' : d.getDate()}</b>${showY ? `<em>${y}</em>` : ''}</span>
     </button>`;
   }).join('')}</div>`;
@@ -169,12 +169,14 @@ function rescale() {
   const wrap = $('chart'), left = wrap.scrollLeft, right = left + wrap.clientWidth;
   const cols = wrap.querySelectorAll('.bar-col');
   let max = S.dayMins;
-  cols.forEach((c, i) => { if (c.offsetLeft + c.offsetWidth > left && c.offsetLeft < right) max = Math.max(max, chart.items[i].a, chart.items[i].s); });
+  cols.forEach((c, i) => { if (c.offsetLeft + c.offsetWidth > left && c.offsetLeft < right) max = Math.max(max, Math.max(0, chart.items[i].a) + Math.max(0, chart.items[i].s)); });
   max *= 1.08;
   cols.forEach((c, i) => {
-    const it = chart.items[i], [ba, bs] = c.querySelectorAll('.bar');
-    ba.style.height = Math.max(1.5, Math.max(0, it.a) / max * 100) + '%';
-    bs.style.height = Math.max(1.5, Math.max(0, it.s) / max * 100) + '%';
+    const it = chart.items[i], a = Math.max(0, it.a), sk = Math.max(0, it.s), tot = a + sk;
+    const fill = c.querySelector('.bar-fill');
+    fill.style.height = Math.max(1.5, tot / max * 100) + '%';
+    fill.querySelector('.seg.a').style.flexGrow = a || 0.0001;
+    fill.querySelector('.seg.s').style.flexGrow = sk || 0.0001;
   });
 }
 $('chart').addEventListener('scroll', () => { cancelAnimationFrame(rescaleRAF); rescaleRAF = requestAnimationFrame(rescale); }, { passive: true });

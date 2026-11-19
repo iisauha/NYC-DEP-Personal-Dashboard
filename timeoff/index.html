@@ -45,22 +45,25 @@
   .bars { display: flex; gap: 4px; height: 210px; width: max-content; padding-right: 8px; }
   .bar-col { flex: 0 0 42px; display: flex; flex-direction: column; align-items: center; gap: 8px; border: 0; background: none; padding: 0; cursor: pointer; color: inherit; font: inherit; }
   .bar-stack { position: relative; flex: 1; width: 100%; }
-  .bar { position: absolute; bottom: 0; left: 50%; border-radius: 6px 6px 2px 2px; transform-origin: bottom; transition: opacity .2s, height .35s var(--ease); }
-  .bar.a { width: 26px; margin-left: -13px; background: var(--annual); opacity: .35; }
-  .bar.s { width: 12px; margin-left: -6px; background: var(--sick); opacity: .55; }
-  .bar-col.now .bar.a, .bar-col.sel .bar.a { opacity: 1; }
-  .bar-col.now .bar.s, .bar-col.sel .bar.s { opacity: 1; }
-  .bar-col.future .bar.a { background: repeating-linear-gradient(135deg, var(--annual) 0 3px, transparent 3px 7px); opacity: .6; }
-  .bar-col.future .bar.s { opacity: .4; }
-  .picking .bar-col.now .bar { opacity: .35; }
-  .bar-col.sel.future .bar.a { background: var(--annual); opacity: .9; }
-  .bar-col.sel.future .bar.s { opacity: 1; }
+  .bar-fill { position: absolute; bottom: 0; left: 50%; width: 26px; margin-left: -13px; display: flex; flex-direction: column;
+    gap: 2px; border-radius: 7px 7px 3px 3px; overflow: hidden; transform-origin: bottom; transition: height .35s var(--ease), opacity .2s; opacity: .4; }
+  .seg { flex: 1 1 0; min-height: 0; transition: flex-grow .35s var(--ease); }
+  .seg.a { background: var(--annual); }
+  .seg.s { background: var(--sick); }
+  .bar-col.now .bar-fill, .bar-col.sel .bar-fill { opacity: 1; }
+  .bar-col.future .bar-fill { opacity: .55; }
+  .bar-col.future .seg { background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.45) 0 3px, transparent 3px 7px); }
+  .picking .bar-col.now .bar-fill { opacity: .4; }
+  .bar-col.sel.future .bar-fill { opacity: 1; }
   .bar-lbl { position: relative; font-size: 11px; font-weight: 700; color: var(--ink-3); line-height: 1.2; text-align: center; height: 42px; }
   .bar-lbl b { display: block; font-size: 13px; color: var(--ink-2); }
   .bar-lbl em { display: block; font-style: normal; font-size: 10px; color: var(--ink-3); }
   .bar-col.now .bar-lbl, .bar-col.sel .bar-lbl, .bar-col.now .bar-lbl b, .bar-col.sel .bar-lbl b { color: var(--ink); }
   .bar-col.use .bar-lbl b::after { content: ""; display: block; width: 4px; height: 4px; border-radius: 50%; background: var(--danger); margin: 2px auto 0; }
   .grow { animation: grow .6s var(--spring) backwards; }
+  .chart-key { display: flex; gap: 14px; font-size: 13px; font-weight: 700; color: var(--ink-2); margin-top: 10px; }
+  .chart-key span { display: inline-flex; align-items: center; gap: 6px; }
+  .chart-key i { width: 10px; height: 10px; border-radius: 3px; }
   @keyframes grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
   .chart-hint { font-size: 13px; font-weight: 600; color: var(--ink-3); margin: 10px 0 0; }
   .fade-up { animation: viewIn .5s var(--ease) both; }
@@ -95,6 +98,7 @@
     </div>
 
     <div class="chart-scroll" id="chart" aria-label="Balance on each deposit date. Swipe for more, tap a bar to see that date."></div>
+    <div class="chart-key"><span><i style="background:var(--annual)"></i>Annual</span><span><i style="background:var(--sick)"></i>Sick</span></div>
     <p class="chart-hint">Swipe for more dates. Tap a bar to see that day.</p>
 
     <div class="actions"><button class="btn" id="logBtn">Log time off</button></div>
