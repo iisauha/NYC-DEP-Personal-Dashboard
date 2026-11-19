@@ -37,31 +37,32 @@
   .tile-hrs { font-size: 16px; font-weight: 700; color: var(--c); margin-top: 6px; }
   .annual { --c: var(--annual); } .sick { --c: var(--sick); }
 
-  .chart-scroll { margin: 22px calc(-1 * var(--gutter)) 0; padding: 0 var(--gutter); overflow-x: auto; overflow-y: hidden;
-    scrollbar-width: none; -webkit-overflow-scrolling: touch; scroll-behavior: smooth;
-    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%);
-            mask-image: linear-gradient(90deg, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%); }
-  .chart-scroll::-webkit-scrollbar { display: none; }
-  .bars { display: flex; gap: 4px; height: 240px; width: max-content; padding-right: 8px; }
-  .bar-col { flex: 0 0 42px; display: flex; flex-direction: column; align-items: center; gap: 8px; border: 0; background: none; padding: 0; cursor: pointer; color: inherit; font: inherit; }
-  .bar-stack { position: relative; flex: 1; width: 100%; }
-  .bar-fill { position: absolute; bottom: 0; left: 50%; width: 30px; margin-left: -15px; display: flex; flex-direction: column;
-    gap: 2px; border-radius: 6px; overflow: hidden; transform-origin: bottom; transition: height .35s var(--ease), opacity .2s; opacity: .4; }
-  .seg { flex: 1 1 0; min-height: 0; transition: flex-grow .35s var(--ease); }
-  .seg.a { background: var(--annual); }
-  .seg.s { background: var(--sick); }
-  .bar-col.now .bar-fill, .bar-col.sel .bar-fill { opacity: 1; }
-  .bar-col.future .bar-fill { opacity: .55; }
-  .bar-col.future .seg { background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.45) 0 3px, transparent 3px 7px); }
-  .picking .bar-col.now .bar-fill { opacity: .4; }
-  .bar-col.sel.future .bar-fill { opacity: 1; }
-  .bar-lbl { position: relative; font-size: 11px; font-weight: 700; color: var(--ink-3); line-height: 1.2; text-align: center; height: 42px; }
-  .bar-lbl b { display: block; font-size: 13px; color: var(--ink-2); }
-  .bar-lbl em { display: block; font-style: normal; font-size: 10px; color: var(--ink-3); }
-  .bar-col.now .bar-lbl, .bar-col.sel .bar-lbl, .bar-col.now .bar-lbl b, .bar-col.sel .bar-lbl b { color: var(--ink); }
-  .bar-col.use .bar-lbl b::after { content: ""; display: block; width: 4px; height: 4px; border-radius: 50%; background: var(--danger); margin: 2px auto 0; }
-  .grow { animation: grow .6s var(--spring) backwards; }
-  .chart-key { display: flex; gap: 14px; font-size: 13px; font-weight: 700; color: var(--ink-2); margin-top: 10px; }
+  .chart { position: relative; margin: 20px calc(-1 * var(--gutter)) 0; height: 230px; touch-action: pan-y; user-select: none; -webkit-user-select: none; cursor: crosshair; }
+  .chart svg { display: block; overflow: visible; }
+  .ln { fill: none; stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; }
+  .ln.a { stroke: var(--annual); } .ln.s { stroke: var(--sick); }
+  .ln.fut { stroke-dasharray: 1 7; stroke-width: 3; opacity: .75; }
+  .draw { animation: draw 1.1s var(--ease) both; }
+  @keyframes draw { from { stroke-dashoffset: var(--len); } to { stroke-dashoffset: 0; } }
+  .today-line { stroke: var(--line); stroke-width: 1; stroke-dasharray: 2 4; }
+  .zero { stroke: var(--line); stroke-width: 1; }
+  .dot { stroke: var(--bg); stroke-width: 2.5; } .dot.a { fill: var(--annual); } .dot.s { fill: var(--sick); }
+  .pulse { opacity: .3; transform-box: fill-box; transform-origin: center; animation: pulse 1.8s ease-out infinite; }
+  .pulse.a { fill: var(--annual); } .pulse.s { fill: var(--sick); animation-delay: .4s; }
+  @keyframes pulse { 0% { transform: scale(.6); opacity: .45; } 100% { transform: scale(2.6); opacity: 0; } }
+  .cursor { opacity: 0; transition: opacity .12s; }
+  .cursor line { stroke: var(--ink-3); stroke-width: 1; }
+  .scrubbing .cursor { opacity: 1; }
+  .scrubbing .pulse, .scrubbing #nowA, .scrubbing #nowS { opacity: 0; }
+  .scrubbing .ln { opacity: .55; } .scrubbing .ln.fut { opacity: .4; }
+  .cur-date { position: absolute; top: 0; transform: translateX(-50%); font-size: 13px; font-weight: 700; color: var(--ink-2); white-space: nowrap; opacity: 0; transition: opacity .12s; pointer-events: none; }
+  .scrubbing .cur-date { opacity: 1; }
+  .chart-ends { display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; color: var(--ink-3); margin-top: 6px; }
+  .ranges { display: flex; justify-content: space-between; margin-top: 14px; }
+  .ranges button { flex: 1; min-height: 36px; border: 0; background: transparent; border-radius: 999px; font: inherit; font-size: 14px; font-weight: 800; color: var(--ink-2); cursor: pointer; transition: background-color .2s, color .2s; }
+  .ranges button[aria-pressed="true"] { background: var(--fill); color: var(--annual); }
+  .chart-key .muted { margin-left: auto; color: var(--ink-3); font-weight: 600; }
+  .chart-key { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; font-weight: 700; color: var(--ink-2); margin-top: 10px; }
   .chart-key span { display: inline-flex; align-items: center; gap: 6px; }
   .chart-key i { width: 10px; height: 10px; border-radius: 3px; }
   @keyframes grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
@@ -114,9 +115,12 @@
       <div class="tile sick"><div class="tile-lbl">Sick</div><div class="tile-num"><span id="numS">0</span><span class="u">days</span></div><div class="tile-hrs" id="hrsS"></div></div>
     </div>
 
-    <div class="chart-scroll" id="chart" aria-label="Balance on each deposit date. Swipe for more, tap a bar to see that date."></div>
-    <div class="chart-key"><span><i style="background:var(--annual)"></i>Annual (top)</span><span><i style="background:var(--sick)"></i>Sick (bottom)</span></div>
-    <p class="chart-hint">Swipe for more dates. Tap a bar to see that day.</p>
+    <div class="chart" id="chart" role="img" aria-label="Annual and sick balance over time. Drag across to see any date."></div>
+    <div class="chart-ends"><span id="lblStart"></span><span id="lblEnd"></span></div>
+    <div class="ranges" id="ranges" role="group" aria-label="Time range">
+      <button data-r="3M" aria-pressed="false">3M</button><button data-r="6M" aria-pressed="true">6M</button><button data-r="1Y" aria-pressed="false">1Y</button><button data-r="2Y" aria-pressed="false">2Y</button><button data-r="All" aria-pressed="false">All</button>
+    </div>
+    <div class="chart-key"><span><i style="background:var(--annual)"></i>Annual</span><span><i style="background:var(--sick)"></i>Sick</span><span class="muted">Drag across the chart to see any date</span></div>
 
     <div class="actions"><button class="btn" id="logBtn">Log time off</button></div>
 
