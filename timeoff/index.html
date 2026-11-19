@@ -51,15 +51,15 @@
   .bar-col { flex: 0 0 40px; display: flex; flex-direction: column; align-items: center; border: 0; background: none; padding: 0; cursor: pointer; color: inherit; font: inherit; }
   .bar-area { position: relative; height: 220px; width: 100%; }
   .bar-fill { position: absolute; bottom: 0; left: 6px; right: 6px; display: flex; flex-direction: column; border-radius: 6px 6px 0 0; overflow: hidden;
-    transform-origin: bottom; opacity: .45; transition: opacity .2s; }
+    transform-origin: bottom; transition: opacity .2s; }
   .seg { display: block; flex: 0 0 auto; }
   .seg.a { background: var(--annual); box-shadow: inset 0 -2px 0 var(--bg); }
   .seg.s { background: var(--sick); }
-  .bar-col.now .bar-fill, .bar-col.sel .bar-fill { opacity: 1; }
-  .bar-col.future .bar-fill { opacity: .6; }
-  .bar-col.future .seg { background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.4) 0 3px, transparent 3px 7px); }
-  .picking .bar-col.now .bar-fill { opacity: .45; }
-  .bar-col.sel.future .bar-fill { opacity: 1; }
+  /* future: same solid colors with stripes, so heights read the same as past bars */
+  .bar-col.future .seg { background-image: repeating-linear-gradient(135deg, rgba(0,0,0,.28) 0 3px, transparent 3px 8px); }
+  /* when a bar is picked, fade the others a little */
+  .picking .bar-col:not(.sel) .bar-fill { opacity: .35; }
+  .bar-col.now .bar-lbl::after { content: ""; display: block; width: 18px; height: 3px; border-radius: 2px; background: var(--ink); margin: 4px auto 0; }
   .bar-lbl { font-size: 11px; font-weight: 700; color: var(--ink-3); line-height: 1.2; text-align: center; height: 42px; padding-top: 8px; }
   .bar-lbl b { display: block; font-size: 13px; color: var(--ink-2); }
   .bar-lbl em { display: block; font-style: normal; font-size: 10px; color: var(--ink-3); }
