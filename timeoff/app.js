@@ -408,13 +408,13 @@ $('openWorkday').addEventListener('click', () => {
   });
 });
 
-/* Dates hours get added */
+/* When hours are added */
 function renderDates() {
   const t = L.today();
   let ym = S.startDate.slice(0, 7), end = `${thisYear + 1}-12`, html = '';
   for (let i = 0; i < 120 && ym <= end; i++) {
     const pd = L.postDate(S, ym), src = L.postSource(S, ym);
-    const tag = pd <= t ? ['counted', 'Added'] : { official: ['official', 'Official'], estimated: ['est', 'Estimated'], edited: ['edited', 'Edited'] }[src];
+    const tag = pd <= t ? ['counted', 'Added'] : src === 'edited' ? ['edited', 'Edited'] : L.delayed(ym) ? ['est', 'Payroll weekend'] : src === 'official' ? ['official', 'Official'] : ['est', 'Estimated'];
     html += `<div class="field"${pd <= t ? ' style="opacity:.6"' : ''}><div class="label">${L.parse(ym + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })} hours
       <div><span class="pill ${tag[0]}">${tag[1]}</span></div></div>
       <input type="date" data-ym="${ym}" value="${pd}" aria-label="Date ${mLong(ym)} hours get added"></div>`;

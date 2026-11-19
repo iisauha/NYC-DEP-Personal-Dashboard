@@ -11,16 +11,21 @@
   const today = () => iso(new Date());
   const nextMonth = ym => { let [y, m] = ym.split('-').map(Number); m++; if (m > 12) { m = 1; y++; } return `${y}-${pad(m)}`; };
 
-  /* Official OPA PMS Monthly Leave Processing Schedule, CY2027 (UB #069-26).
+  /* Official OPA PMS Monthly Leave Processing Schedules, 2026 and 2027.
      Key = accrual month, value = processing date (a Saturday). */
   const OFFICIAL = {
+    '2026-01': '2026-02-07', '2026-02': '2026-03-07', '2026-03': '2026-04-11', '2026-04': '2026-05-09',
+    '2026-05': '2026-06-13', '2026-06': '2026-07-11', '2026-07': '2026-08-08', '2026-08': '2026-09-12',
+    '2026-09': '2026-10-10', '2026-10': '2026-11-07', '2026-11': '2026-12-12', '2026-12': '2027-01-09',
     '2027-01': '2027-02-13', '2027-02': '2027-03-13', '2027-03': '2027-04-10', '2027-04': '2027-05-08',
     '2027-05': '2027-06-12', '2027-06': '2027-07-10', '2027-07': '2027-08-07', '2027-08': '2027-09-11',
     '2027-09': '2027-10-09', '2027-10': '2027-11-13', '2027-11': '2027-12-11', '2027-12': '2028-01-08'
   };
+  /* Biweekly Friday paydays, anchored on Jan 2, 2026. */
+  const PAY_ANCHOR = new Date(2026, 0, 2);
 
-  /* Rule from the OPA schedule: leave runs the Saturday that ends the first full week of the
-     next month (matches all 12 official 2027 dates). Hours show in CityTime the Monday after. */
+  /* Processing runs the Saturday that ends the first full week of the next month
+     (matches every official 2026 and 2027 date). */
   function processDate(ym) {
     if (OFFICIAL[ym]) return OFFICIAL[ym];
     const [y, m] = ym.split('-').map(Number);
@@ -28,7 +33,19 @@
     const firstSun = addDays(first, (7 - first.getDay()) % 7);
     return iso(addDays(firstSun, 6));
   }
-  const defaultPost = ym => iso(addDays(parse(processDate(ym)), 2));
+  /* A pay calculation weekend is the Saturday 6 days before a payday. The schedule marks
+     those processing dates with an asterisk (all 7 in 2026 match this). */
+  function isPayCalcWeekend(procISO) {
+    const days = Math.round((addDays(parse(procISO), 6) - PAY_ANCHOR) / 864e5);
+    return days % 14 === 0;
+  }
+  /* When hours show up in CityTime: the processing Saturday, or one week later when
+     that Saturday is a pay calculation weekend (observed Jul and Aug 2026). */
+  function defaultPost(ym) {
+    const p = processDate(ym);
+    return isPayCalcWeekend(p) ? iso(addDays(parse(p), 7)) : p;
+  }
+  const delayed = ym => isPayCalcWeekend(processDate(ym));
 
   /* Nothing personal lives in the code: every value below is entered on first launch
      and saved only in this browser's localStorage. */
@@ -50,6 +67,8 @@
     if (!S.startDate) S.startDate = today();
     if (!S.anchor || !S.anchor.date) S.anchor = { date: today(), annual: 0, sick: 0 };
     if (S.version !== 3) { S.postOverrides = {}; S.version = 3; } // older versions used paycheck dates
+    // drop edited dates that now match the built-in pattern
+    for (const ym of Object.keys(S.postOverrides || {})) if (S.postOverrides[ym] === defaultPost(ym)) delete S.postOverrides[ym];
     return S;
   }
   function save(S) { try { localStorage.setItem(KEY, JSON.stringify(S)); return true; } catch (e) { return false; } }
@@ -60,7 +79,7 @@
     return r;
   }
   const postDate = (S, ym) => S.postOverrides[ym] || defaultPost(ym);
-  const postSource = (S, ym) => S.postOverrides[ym] ? 'edited' : OFFICIAL[ym] ? 'official' : 'estimated';
+  const postSource = (S, ym) => S.postOverrides[ym] ? 'edited' : OFFICIAL[ym] && !delayed(ym) ? 'official' : 'estimated';
 
   /* All balance changes after the anchor date, up to `until`. */
   function events(S, until) {
@@ -157,6 +176,6 @@
   const fmtMonth = ym => parse(ym + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   global.Leave = { KEY, DEFAULT, OFFICIAL, load, save, iso, parse, addDays, today, nextMonth,
-    defaultPost, postDate, postSource, rateFor, events, balanceOn, nextCredit, lastCredit, series, valueAt,
+    defaultPost, delayed, processDate, postDate, postSource, rateFor, events, balanceOn, nextCredit, lastCredit, series, valueAt,
     fmtHM, fmtDays, toDays, fmtDate, fmtMonth };
 })(window);
