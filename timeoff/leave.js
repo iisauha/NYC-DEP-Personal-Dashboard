@@ -11,16 +11,27 @@
   const today = () => iso(new Date());
   const nextMonth = ym => { let [y, m] = ym.split('-').map(Number); m++; if (m > 12) { m = 1; y++; } return `${y}-${pad(m)}`; };
 
-  /* Each month's hours post on the first Saturday of the next month (Nov 7, Dec 5, Jan 2, Feb 6...).
-     Earlier 2026 deposits came on other Saturdays, so those dates are kept as they happened.
-     Any date can be changed on the Schedule screen. */
-  const PAST = { '2026-06': '2026-07-18', '2026-07': '2026-08-15', '2026-08': '2026-09-12', '2026-09': '2026-10-10' };
-  function firstSaturdayAfter(ym) {
+  /* City schedule (OPA PMS Monthly Leave Processing Schedule, 2026 and 2027): hours show up on the
+     processing Saturday. Key = accrual month, value = processing date. */
+  const OFFICIAL = {
+    '2026-01': '2026-02-07', '2026-02': '2026-03-07', '2026-03': '2026-04-11', '2026-04': '2026-05-09',
+    '2026-05': '2026-06-13', '2026-06': '2026-07-11', '2026-07': '2026-08-08', '2026-08': '2026-09-12',
+    '2026-09': '2026-10-10', '2026-10': '2026-11-07', '2026-11': '2026-12-12', '2026-12': '2027-01-09',
+    '2027-01': '2027-02-13', '2027-02': '2027-03-13', '2027-03': '2027-04-10', '2027-04': '2027-05-08',
+    '2027-05': '2027-06-12', '2027-06': '2027-07-10', '2027-07': '2027-08-07', '2027-08': '2027-09-11',
+    '2027-09': '2027-10-09', '2027-10': '2027-11-13', '2027-11': '2027-12-11', '2027-12': '2028-01-08'
+  };
+  /* First two months as a new employee came later than the schedule; keep what actually happened. */
+  const PAST = { '2026-06': '2026-07-18', '2026-07': '2026-08-15' };
+  /* After 2027: the schedule's rule, the Saturday ending the first full week of the next month
+     (matches every official 2026 and 2027 date). */
+  function ruleDate(ym) {
     const [y, m] = ym.split('-').map(Number);
-    const first = new Date(y, m, 1);                    // 1st of the next month
-    return iso(addDays(first, (6 - first.getDay() + 7) % 7));
+    const first = new Date(y, m, 1);
+    const firstSun = addDays(first, (7 - first.getDay()) % 7);
+    return iso(addDays(firstSun, 6));
   }
-  const defaultPost = ym => PAST[ym] || firstSaturdayAfter(ym);
+  const defaultPost = ym => PAST[ym] || OFFICIAL[ym] || ruleDate(ym);
 
   /* Nothing personal lives in the code: every value below is entered on first launch
      and saved only in this browser's localStorage. */
@@ -60,7 +71,7 @@
     return r;
   }
   const postDate = (S, ym) => S.postOverrides[ym] || defaultPost(ym);
-  const postSource = (S, ym) => S.postOverrides[ym] ? 'edited' : 'estimated';
+  const postSource = (S, ym) => S.postOverrides[ym] ? 'edited' : PAST[ym] ? 'actual' : OFFICIAL[ym] ? 'official' : 'estimated';
 
   /* All balance changes after the anchor date, up to `until`. */
   function events(S, until) {
