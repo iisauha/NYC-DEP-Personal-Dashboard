@@ -21,7 +21,7 @@
   /* Nothing personal lives in the code: every value below is entered on first launch
      and saved only in this browser's localStorage. */
   const DEFAULT = {
-    version: 3,
+    version: 4,
     setupDone: false,
     startDate: null,
     dayMins: 420,
@@ -37,7 +37,13 @@
     catch (e) { S = JSON.parse(JSON.stringify(DEFAULT)); }
     if (!S.startDate) S.startDate = today();
     if (!S.anchor || !S.anchor.date) S.anchor = { date: today(), annual: 0, sick: 0 };
-    if (S.version !== 3) { S.postOverrides = {}; S.version = 3; } // older versions used paycheck dates
+    if (!S.version || S.version < 3) { S.postOverrides = {}; S.version = 3; } // older versions used paycheck dates
+    // v4: count from the first day (zero balance) using the monthly hours, instead of an
+    // entered starting balance. Deposits have matched the monthly rate exactly.
+    if (S.version < 4) {
+      if (S.startDate) S.anchor = { date: iso(addDays(parse(S.startDate), -1)), annual: 0, sick: 0 };
+      S.version = 4;
+    }
     // drop edited dates that now match the built-in pattern
     for (const ym of Object.keys(S.postOverrides || {})) if (S.postOverrides[ym] === defaultPost(ym)) delete S.postOverrides[ym];
     return S;

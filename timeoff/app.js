@@ -2,6 +2,7 @@
 'use strict';
 const L = window.Leave;
 let S = L.load();
+L.save(S); // keep any one-time update from load()
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const persist = () => { if (!L.save(S)) snack('Could not save on this device'); };
@@ -445,6 +446,7 @@ function renderSetup() {
 $('setupSave').addEventListener('click', () => {
   S.startDate = $('sStart').value || L.today();
   S.anchor = { date: L.today(), annual: readDur('sA'), sick: readDur('sS') };
+  if (!S.anchor.annual && !S.anchor.sick) S.anchor = { date: L.iso(L.addDays(L.parse(S.startDate), -1)), annual: 0, sick: 0 };
   const a = readDur('sRA'), s = readDur('sRS');
   S.rates = (a || s) ? [{ from: S.startDate.slice(0, 7), title: $('sTitle').value.trim(), annual: a, sick: s }] : [];
   const d = readDur('sDay'); if (d > 0) S.dayMins = d;
