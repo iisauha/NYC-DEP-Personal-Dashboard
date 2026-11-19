@@ -136,85 +136,56 @@ function renderHome(animate) {
   $('takenFoot').textContent = `"In CityTime" means it's on or before ${dShort(S.anchor.date)}, the date of your balance, so it isn't subtracted again.`;
 }
 
-/* ---------- chart: two step lines (annual, sick); drag to scrub, like a stock chart ---------- */
-const RANGES = { '3M': [-45, 46], '6M': [-91, 92], '1Y': [-183, 183], '2Y': [-183, 548], 'All': null };
-let range = '6M', chart = null;
+/* ---------- chart: stacked bars (sick bottom, annual top) on one fixed scale ---------- */
+let chart = null, selIdx = null;
+const BAR_H = 220;                       // px height of the bar area; every bar uses this same scale
+function niceStep(maxDays) { for (const s of [1, 2, 5, 10, 20, 25, 50]) if (maxDays / s <= 5) return s; return 100; }
 function drawChart(animate) {
   const wrap = $('chart'); if (!wrap) return;
-  const t = L.today(), tD = L.parse(t);
-  let from, to;
-  if (RANGES[range]) { from = L.iso(L.addDays(tD, RANGES[range][0])); to = L.iso(L.addDays(tD, RANGES[range][1])); }
-  else { from = S.startDate; to = L.iso(L.addDays(tD, 548)); }
-  if (from < S.startDate) { const shift = L.parse(S.startDate) - L.parse(from); from = S.startDate; to = L.iso(new Date(L.parse(to).getTime() + shift)); }
-  const pa = L.series(S, 'annual', to), ps = L.series(S, 'sick', to);
-  const W = wrap.clientWidth, H = wrap.clientHeight, padX = 4, padTop = 30, padBot = 6;
-  const t0 = L.parse(from).getTime(), t1 = L.parse(to).getTime();
-  const xOf = d => padX + (L.parse(d).getTime() - t0) / (t1 - t0) * (W - 2 * padX);
-  const clip = pts => { const out = [{ date: from, value: L.valueAt(pts, from) }]; for (const p of pts) if (p.date > from && p.date <= to) out.push(p); out.push({ date: to, value: L.valueAt(pts, to) }); return out; };
-  const ca = clip(pa), cs = clip(ps);
-  const max = Math.max(S.dayMins, ...ca.map(p => p.value), ...cs.map(p => p.value)) * 1.06;
-  const min = Math.min(0, ...ca.map(p => p.value), ...cs.map(p => p.value));
-  const yOf = v => padTop + (1 - (v - min) / (max - min)) * (H - padTop - padBot);
-  const path = list => list.map((p, i) => i ? `H${xOf(p.date).toFixed(1)}V${yOf(p.value).toFixed(1)}` : `M${xOf(p.date).toFixed(1)},${yOf(p.value).toFixed(1)}`).join('');
-  const split = (list, v) => {
-    const past = list.filter(p => p.date <= t).concat({ date: t, value: v });
-    const fut = [{ date: t, value: v }].concat(list.filter(p => p.date > t));
-    return [path(past), path(fut)];
-  };
-  const va = L.valueAt(pa, t), vs = L.valueAt(ps, t);
-  const [aPast, aFut] = split(ca, va), [sPast, sFut] = split(cs, vs);
-  const xt = xOf(t), showT = t >= from && t <= to;
-  wrap.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" aria-hidden="true">
-    ${min < 0 ? `<line class="zero" x1="0" x2="${W}" y1="${yOf(0)}" y2="${yOf(0)}"/>` : ''}
-    ${showT ? `<line class="today-line" x1="${xt}" x2="${xt}" y1="${padTop - 6}" y2="${H}"/>` : ''}
-    <path class="ln s fut" d="${sFut}"/><path class="ln a fut" d="${aFut}"/>
-    <path class="ln s past${animate ? ' draw' : ''}" d="${sPast}"/><path class="ln a past${animate ? ' draw' : ''}" d="${aPast}"/>
-    ${showT ? `<circle class="pulse a" cx="${xt}" cy="${yOf(va)}" r="6"/><circle class="pulse s" cx="${xt}" cy="${yOf(vs)}" r="6"/>
-    <circle class="dot a" id="nowA" cx="${xt}" cy="${yOf(va)}" r="5"/><circle class="dot s" id="nowS" cx="${xt}" cy="${yOf(vs)}" r="5"/>` : ''}
-    <g class="cursor" id="cursor"><line id="curLine" x1="0" x2="0" y1="${padTop - 6}" y2="${H}"/>
-      <circle class="dot a" id="curA" r="6"/><circle class="dot s" id="curS" r="6"/></g>
-  </svg><div class="cur-date" id="curDate"></div>`;
-  if (animate && !matchMedia('(prefers-reduced-motion: reduce)').matches)
-    wrap.querySelectorAll('.ln.past').forEach(p => { const len = p.getTotalLength(); p.style.strokeDasharray = len; p.style.setProperty('--len', len); });
-  $('lblStart').textContent = L.fmtDate(from, { month: 'short', day: 'numeric', year: 'numeric' });
-  $('lblEnd').textContent = L.fmtDate(to, { month: 'short', day: 'numeric', year: 'numeric' });
-  chart = { pa, ps, from, to, t0, t1, W, padX, xOf, yOf };
+  const t = L.today(), end = L.iso(L.addDays(L.parse(t), 190));   // about 6 months ahead
+  const pa = L.series(S, 'annual', end), ps = L.series(S, 'sick', end);
+  const dates = new Set([t]);
+  let ym = S.startDate.slice(0, 7);
+  for (let i = 0; i < 400; i++) { const pd = L.postDate(S, ym); if (pd > end) break; if (L.rateFor(S, ym) && pd >= S.startDate) dates.add(pd); ym = L.nextMonth(ym); }
+  for (const g of groupUses()) { const d = g.items[g.items.length - 1].date; if (d >= S.startDate && d <= end) dates.add(d); }
+  const items = [...dates].sort().map(d => ({ date: d, a: Math.max(0, L.valueAt(pa, d)), s: Math.max(0, L.valueAt(ps, d)), now: d === t, future: d > t,
+    use: S.uses.some(u => u.date === d) }));
+  // one scale for the whole chart, rounded up to a clean number of days
+  const maxTotal = Math.max(S.dayMins, ...items.map(i => i.a + i.s));
+  const topMins = maxTotal * 1.06;
+  const step = niceStep(topMins / S.dayMins);
+  const scale = BAR_H / topMins;                     // px per minute, same for every bar
+  const px = m => Math.round(m * scale);
+  let grid = '<div class="gl base" style="bottom:0"></div>';
+  for (let d = step; d * S.dayMins <= topMins; d += step)
+    grid += `<div class="gl" style="bottom:${Math.round(d * S.dayMins * scale)}px"><span>${d}d</span></div>`;
+  let prevYear = null;
+  wrap.innerHTML = `<div class="grid" aria-hidden="true">${grid}</div>
+    <div class="bar-scroll" id="barScroll"><div class="bars">${items.map((it, i) => {
+    const d = L.parse(it.date), y = d.getFullYear(), showY = prevYear !== null && y !== prevYear; prevYear = y;
+    const total = px(it.a + it.s), sick = px(it.s), annual = total - sick;
+    return `<button class="bar-col${it.future ? ' future' : ''}${it.now ? ' now' : ''}${it.use ? ' use' : ''}" data-i="${i}" aria-label="${L.fmtDate(it.date)}: ${L.fmtHM(it.a)} annual, ${L.fmtHM(it.s)} sick">
+      <span class="bar-area"><span class="bar-fill${animate ? ' grow' : ''}" style="height:${total}px;animation-delay:${Math.min(i, 16) * 25}ms">
+        <span class="seg a" style="height:${annual}px"></span><span class="seg s" style="height:${sick}px"></span></span></span>
+      <span class="bar-lbl">${it.now ? 'Today' : d.toLocaleDateString('en-US', { month: 'short' })}<b>${it.now ? '&nbsp;' : d.getDate()}</b>${showY ? `<em>${y}</em>` : ''}</span>
+    </button>`;
+  }).join('')}</div></div>`;
+  chart = { items, pa, ps };
+  selIdx = null;
+  const sc = $('barScroll'), nowEl = sc.querySelector('.bar-col.now');
+  if (nowEl) sc.scrollLeft = Math.max(0, nowEl.offsetLeft - sc.clientWidth * 0.6);
 }
-
-let lastScrub = null;
-function scrubAt(clientX) {
-  if (!chart) return;
-  const wrap = $('chart'), r = wrap.getBoundingClientRect();
-  const x = Math.max(chart.padX, Math.min(chart.W - chart.padX, clientX - r.left));
-  const ms = chart.t0 + (x - chart.padX) / (chart.W - 2 * chart.padX) * (chart.t1 - chart.t0);
-  const date = L.iso(new Date(ms));
-  const va = L.valueAt(chart.pa, date), vs = L.valueAt(chart.ps, date);
-  wrap.classList.add('scrubbing');
-  $('curLine').setAttribute('x1', x); $('curLine').setAttribute('x2', x);
-  $('curA').setAttribute('cx', x); $('curA').setAttribute('cy', chart.yOf(va));
-  $('curS').setAttribute('cx', x); $('curS').setAttribute('cy', chart.yOf(vs));
-  const cd = $('curDate'); cd.textContent = L.fmtDate(date, { month: 'short', day: 'numeric', year: 'numeric' });
-  cd.style.left = Math.max(44, Math.min(chart.W - 44, x)) + 'px';
-  showDate(date, L.fmtDate(date, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) + (date > L.today() ? ', projected' : ''), false);
-  const key = va + '|' + vs;
-  if (lastScrub !== null && key !== lastScrub && navigator.vibrate) navigator.vibrate(5);
-  lastScrub = key;
-}
-function endScrub() {
-  const wrap = $('chart'); if (!wrap.classList.contains('scrubbing')) return;
-  wrap.classList.remove('scrubbing'); lastScrub = null;
-  showDate(L.today(), todayLabel(), true);
-}
-$('chart').addEventListener('pointerdown', e => { $('chart').setPointerCapture(e.pointerId); scrubAt(e.clientX); });
-$('chart').addEventListener('pointermove', e => { if ($('chart').hasPointerCapture(e.pointerId) || e.pointerType === 'mouse') scrubAt(e.clientX); });
-$('chart').addEventListener('pointerup', endScrub);
-$('chart').addEventListener('pointercancel', endScrub);
-$('chart').addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') endScrub(); });
-$('ranges').addEventListener('click', e => {
-  const b = e.target.closest('button[data-r]'); if (!b) return;
-  range = b.dataset.r;
-  $('ranges').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b));
-  drawChart(true);
+$('chart').addEventListener('click', e => {
+  const col = e.target.closest('.bar-col'); if (!col) return;
+  const i = +col.dataset.i, it = chart.items[i];
+  const cols = $('chart').querySelectorAll('.bar-col');
+  if (selIdx === i || it.now) {
+    selIdx = null; cols.forEach(c => c.classList.remove('sel')); $('chart').classList.remove('picking');
+    showDate(L.today(), todayLabel()); return;
+  }
+  selIdx = i; cols.forEach((c, k) => c.classList.toggle('sel', k === i)); $('chart').classList.add('picking');
+  if (navigator.vibrate) navigator.vibrate(4);
+  showDate(it.date, L.fmtDate(it.date, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) + (it.future ? ', projected' : ''));
 });
 window.addEventListener('resize', () => { if (view === 'home') drawChart(false); });
 
