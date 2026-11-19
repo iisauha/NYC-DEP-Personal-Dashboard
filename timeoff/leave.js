@@ -11,12 +11,16 @@
   const today = () => iso(new Date());
   const nextMonth = ym => { let [y, m] = ym.split('-').map(Number); m++; if (m > 12) { m = 1; y++; } return `${y}-${pad(m)}`; };
 
-  /* Hours show up every 4 weeks on a Saturday, starting with June 2026 hours on Sat Jul 18, 2026
-     (observed: Jul 18, Aug 15, Sep 12, Oct 10, Nov 7). Each month's hours take the next slot.
+  /* Each month's hours post on the first Saturday of the next month (Nov 7, Dec 5, Jan 2, Feb 6...).
+     Earlier 2026 deposits came on other Saturdays, so those dates are kept as they happened.
      Any date can be changed on the Schedule screen. */
-  const FIRST_YM = '2026-06', FIRST_POST = new Date(2026, 6, 18), EVERY_DAYS = 28;
-  const monthsBetween = (a, b) => { const [y1, m1] = a.split('-').map(Number), [y2, m2] = b.split('-').map(Number); return (y2 - y1) * 12 + (m2 - m1); };
-  const defaultPost = ym => iso(addDays(FIRST_POST, monthsBetween(FIRST_YM, ym) * EVERY_DAYS));
+  const PAST = { '2026-06': '2026-07-18', '2026-07': '2026-08-15', '2026-08': '2026-09-12', '2026-09': '2026-10-10' };
+  function firstSaturdayAfter(ym) {
+    const [y, m] = ym.split('-').map(Number);
+    const first = new Date(y, m, 1);                    // 1st of the next month
+    return iso(addDays(first, (6 - first.getDay() + 7) % 7));
+  }
+  const defaultPost = ym => PAST[ym] || firstSaturdayAfter(ym);
 
   /* Nothing personal lives in the code: every value below is entered on first launch
      and saved only in this browser's localStorage. */
