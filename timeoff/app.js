@@ -35,10 +35,9 @@ function route() {
   $('settingsBtn').hidden = view !== 'home';
   $('barTitle').textContent = $('view-' + view).dataset.title;
   $('snackbar').classList.remove('show');
-  if (view !== 'home') document.body.classList.remove('sick-mode');
   const el = $('view-' + view); el.classList.remove('view-enter'); void el.offsetWidth; el.classList.add('view-enter');
   $('scroller').scrollTop = 0;
-  ({ home: () => { shown = null; renderHome(true); }, settings: () => { renderSettings(); applyTheme(); }, dates: renderDates, setup: renderSetup })[view]();
+  ({ home: () => renderHome(true), settings: () => { renderSettings(); applyTheme(); }, dates: renderDates, setup: renderSetup })[view]();
 }
 window.addEventListener('hashchange', route);
 $('settingsBtn').addEventListener('click', () => { location.hash = 'settings'; });
@@ -73,65 +72,51 @@ function applyTheme() {
 }
 $('themeToggle').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
-  S.theme = b.dataset.theme; persist(); applyTheme(); drawChart(false);
+  S.theme = b.dataset.theme; persist(); applyTheme();
   if (navigator.standalone) snack('Close and reopen the app to update the top bar');
 });
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { applyTheme(); });
 
-/* ---------- home ---------- */
-let leaveType = 'annual';
-let shown = null;          // number currently on screen (days), for count-up
-let countRAF = 0;
-function setBig(mins, animate) {
-  const target = mins / S.dayMins;
-  const el = $('bigNum');
-  const fmt = v => (Math.round(v * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  cancelAnimationFrame(countRAF);
-  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (!animate || shown === null || reduce) { el.textContent = fmt(target); shown = target; }
+/* ---------- home: both balances, one chart, one list ---------- */
+const shownN = { annual: null, sick: null };
+const rafN = { annual: 0, sick: 0 };
+const fmt2 = v => (Math.round(v * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function setNum(type, mins, animate) {
+  const el = $(type === 'annual' ? 'numA' : 'numS'), target = mins / S.dayMins;
+  cancelAnimationFrame(rafN[type]);
+  if (!animate || shownN[type] === null || matchMedia('(prefers-reduced-motion: reduce)').matches) { el.textContent = fmt2(target); shownN[type] = target; }
   else {
-    const from = shown, t0 = performance.now(), dur = 650;
-    const step = now => {
-      const p = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - p, 4);
-      const v = from + (target - from) * e; el.textContent = fmt(v); shown = v;
-      if (p < 1) countRAF = requestAnimationFrame(step);
-    };
-    countRAF = requestAnimationFrame(step);
+    const from = shownN[type], t0 = performance.now();
+    const step = now => { const p = Math.min(1, (now - t0) / 550), e = 1 - Math.pow(1 - p, 4), v = from + (target - from) * e;
+      el.textContent = fmt2(v); shownN[type] = v; if (p < 1) rafN[type] = requestAnimationFrame(step); };
+    rafN[type] = requestAnimationFrame(step);
   }
   el.classList.toggle('neg', mins < 0);
-  $('bigUnit').textContent = Math.abs(target) === 1 ? 'day' : 'days';
-  $('subHours').textContent = `${L.fmtHM(mins)} total`;
+  $(type === 'annual' ? 'hrsA' : 'hrsS').textContent = L.fmtHM(mins);
 }
-function setDeltaDefault() {
-  const last = L.lastCredit(S, L.today()), d = $('delta');
-  d.classList.remove('scrub');
-  d.textContent = last ? `+${L.fmtHM(last[leaveType])} added ${L.fmtDate(last.date, { month: 'short', day: 'numeric' })}` : '';
+function showDate(date, label) {
+  const b = L.balanceOn(S, date);
+  if (date < S.anchor.date && chart) { // before the CityTime date: read from the chart history
+    b.annual = L.valueAt(chart.pa, date); b.sick = L.valueAt(chart.ps, date);
+  }
+  setNum('annual', b.annual, true); setNum('sick', b.sick, true);
+  $('asOfLine').textContent = label;
 }
-
-$('typeToggle').addEventListener('click', e => {
-  const b = e.target.closest('button'); if (!b || b.dataset.t === leaveType) return;
-  leaveType = b.dataset.t; pressOne($('typeToggle'), b);
-  document.body.classList.toggle('sick-mode', leaveType === 'sick');
-  renderHome(true);
-});
+const todayLabel = () => 'Today, ' + L.fmtDate(L.today(), { month: 'short', day: 'numeric' });
 
 function renderHome(animate) {
-  const t = L.today(), b = L.balanceOn(S, t);
-  document.body.classList.toggle('sick-mode', leaveType === 'sick');
-  placeThumb($('typeToggle'));
-  setBig(b[leaveType], animate !== false);
-  setDeltaDefault();
-  drawChart(true);
+  const t = L.today();
+  shownN.annual = shownN.sick = null;
+  drawChart(animate !== false);
+  showDate(t, todayLabel());
 
   const last = L.lastCredit(S, t), next = L.nextCredit(S, t);
-  const row = (label, c, est) => c ? `<div class="row"><span class="badge-icon ${leaveType}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 6v12M6 12h12"/></svg></span>
-      <div class="row-main"><div class="row-title">${label}</div>
-      <div class="row-sub">${dShort(c.date)}, ${mName(c.ym)} hours</div></div>
-      <div class="row-value credit-amt">+${L.fmtHM(c[leaveType])}</div></div>` : '';
-  $('credits').innerHTML = (row('Last added', last) + row('Next', next, next && L.postSource(S, next.ym) === 'estimated'))
-    || '<div class="empty">Add your monthly hours in Settings.</div>';
+  const row = (label, c, fut) => c ? `<div class="row"><span class="badge-icon neutral"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 6v12M6 12h12"/></svg></span>
+      <div class="row-main"><div class="row-title">${label}</div><div class="row-sub">${dShort(c.date)}</div></div>
+      <div class="row-value"><span style="color:var(--annual)">+${L.fmtHM(c.annual)}</span><small><span style="color:var(--sick);font-weight:600">+${L.fmtHM(c.sick)}</span></small></div></div>` : '';
+  $('credits').innerHTML = (row('Next deposit', next, true) + row('Last deposit', last)) || '<div class="empty">Add your monthly hours in Settings.</div>';
 
-  const uses = [...S.uses].filter(u => u.type === leaveType).sort((x, y) => y.date.localeCompare(x.date));
+  const uses = [...S.uses].sort((x, y) => y.date.localeCompare(x.date));
   let counted = false;
   $('taken').innerHTML = uses.length ? uses.map(u => {
     const tag = u.date > t ? '<span class="pill planned">Planned</span>'
@@ -139,68 +124,72 @@ function renderHome(animate) {
     return `<li><button class="row" data-use="${u.id}">
       <span class="badge-icon ${u.type}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 12h12"/></svg></span>
       <div class="row-main"><div class="row-title">${dShort(u.date)} ${tag}</div>
-      <div class="row-sub">${u.note ? esc(u.note) : NAME[u.type] + ' leave'}</div></div>
-      <div class="row-value">−${L.fmtHM(u.mins)}<small>${days(u.mins)} ${dayWord(u.mins)}</small></div></button></li>`;
-  }).join('') : `<li class="empty">No ${leaveType} time off logged yet.</li>`;
+      <div class="row-sub">${NAME[u.type]}${u.note ? ', ' + esc(u.note) : ''}</div></div>
+      <div class="row-value" style="color:var(--${u.type})">−${L.fmtHM(u.mins)}<small>${days(u.mins)} ${dayWord(u.mins)}</small></div></button></li>`;
+  }).join('') : '<li class="empty">Nothing logged yet.</li>';
   $('takenFoot').hidden = !counted;
   $('takenFoot').textContent = `"In CityTime" means it's on or before ${dShort(S.anchor.date)}, the date of your balance, so it isn't subtracted again.`;
 }
 
-/* ---------- chart: balance at the end of each month, drag or tap a bar ---------- */
-let chart = null;
-function monthEnd(ym) { const [y, m] = ym.split('-').map(Number); return L.iso(new Date(y, m, 0)); }
+/* ---------- chart: a bar for every deposit date plus today; annual and sick layered ---------- */
+let chart = null, selIdx = null;
 function drawChart(animate) {
-  const wrap = $('chart'); if (!wrap || wrap.offsetParent === null) return;
-  const t = L.today(), nowYM = t.slice(0, 7);
-  let first = S.startDate.slice(0, 7);
-  // keep about 12 bars: up to 6 past months, this month, 5 ahead
-  const back = []; let ym = nowYM;
-  for (let i = 0; i < 6 && ym > first; i++) { ym = (([y, m]) => m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`)(ym.split('-').map(Number)); back.unshift(ym); }
-  const months = [...back, nowYM]; ym = nowYM;
-  for (let i = 0; i < 5; i++) { ym = L.nextMonth(ym); months.push(ym); }
-  const endDate = monthEnd(months[months.length - 1]);
-  const pts = L.series(S, leaveType, endDate);
-  const bars = months.map(m => {
-    const date = m === nowYM ? t : monthEnd(m);
-    return { ym: m, date, value: L.valueAt(pts, date), future: m > nowYM, now: m === nowYM };
-  });
-  const max = Math.max(S.dayMins, ...bars.map(b => b.value));
-  wrap.innerHTML = `<div class="bars">${bars.map((b, i) => `
-      <div class="bar-col${b.future ? ' future' : ''}${b.now ? ' now' : ''}" data-i="${i}">
-        <div class="bar${animate ? ' grow' : ''}" style="height:${Math.max(2, Math.max(0, b.value) / max * 100)}%;animation-delay:${i * 35}ms"></div>
-        <span class="bar-lbl">${L.parse(b.ym + '-01').toLocaleDateString('en-US', { month: 'narrow' })}</span>
-      </div>`).join('')}</div>`;
-  $('lblStart').textContent = L.fmtMonth(months[0]).replace(/ (\d{4})$/, ' $1');
-  $('lblEnd').textContent = L.fmtMonth(months[months.length - 1]);
-  chart = { bars };
+  const wrap = $('chart'); if (!wrap) return;
+  const t = L.today(), end = L.iso(L.addDays(L.parse(t), 730));
+  const pa = L.series(S, 'annual', end), ps = L.series(S, 'sick', end);
+  const dates = new Set([t]);
+  let ym = S.startDate.slice(0, 7);
+  for (let i = 0; i < 400; i++) { const pd = L.postDate(S, ym); if (pd > end) break; if (L.rateFor(S, ym) && pd >= S.startDate) dates.add(pd); ym = L.nextMonth(ym); }
+  for (const u of S.uses) if (u.date >= S.startDate && u.date <= end) dates.add(u.date);
+  const items = [...dates].sort().map(d => ({ date: d, a: L.valueAt(pa, d), s: L.valueAt(ps, d), now: d === t, future: d > t,
+    use: S.uses.some(u => u.date === d) }));
+  const max = Math.max(S.dayMins, ...items.map(i => Math.max(i.a, i.s)));
+  let prevYear = null;
+  wrap.innerHTML = `<div class="bars" id="bars">${items.map((it, i) => {
+    const d = L.parse(it.date), y = d.getFullYear(), showY = prevYear !== null && y !== prevYear; prevYear = y;
+    const h = v => Math.max(1.5, Math.max(0, v) / max * 100);
+    return `<button class="bar-col${it.future ? ' future' : ''}${it.now ? ' now' : ''}${it.use ? ' use' : ''}" data-i="${i}" aria-label="${L.fmtDate(it.date)}">
+      <span class="bar-stack"><span class="bar a${animate ? ' grow' : ''}" style="height:${h(it.a)}%;animation-delay:${Math.min(i, 20) * 25}ms"></span>
+      <span class="bar s${animate ? ' grow' : ''}" style="height:${h(it.s)}%;animation-delay:${Math.min(i, 20) * 25 + 60}ms"></span></span>
+      <span class="bar-lbl">${it.now ? 'Today' : d.toLocaleDateString('en-US', { month: 'short' })}<b>${it.now ? '&nbsp;' : d.getDate()}</b>${showY ? `<em>${y}</em>` : ''}</span>
+    </button>`;
+  }).join('')}</div>`;
+  chart = { items, pa, ps };
+  selIdx = null;
+  const nowEl = wrap.querySelector('.bar-col.now');
+  wrap.style.scrollBehavior = 'auto';
+  if (nowEl) wrap.scrollLeft = Math.max(0, nowEl.offsetLeft - wrap.clientWidth * 0.62);
+  wrap.style.scrollBehavior = '';
+  rescale();
 }
-let selBar = null;
-function scrubAt(clientX) {
+/* Scale bars to the dates in view, so they always fill the chart as you swipe. */
+let rescaleRAF = 0;
+function rescale() {
   if (!chart) return;
-  const cols = [...$('chart').querySelectorAll('.bar-col')];
-  let i = cols.findIndex(c => { const r = c.getBoundingClientRect(); return clientX >= r.left - 2 && clientX <= r.right + 2; });
-  if (i < 0) { const r0 = cols[0].getBoundingClientRect(); i = clientX < r0.left ? 0 : cols.length - 1; }
-  if (i === selBar) return;
-  if (selBar !== null && navigator.vibrate) navigator.vibrate(4);
-  selBar = i;
-  cols.forEach((c, k) => c.classList.toggle('sel', k === i));
-  $('chart').classList.add('scrubbing');
-  const b = chart.bars[i];
-  setBig(b.value, true);
-  const d = $('delta'); d.classList.add('scrub');
-  d.textContent = b.now ? 'Today' : `End of ${L.fmtMonth(b.ym)}${b.future ? ', projected' : ''}`;
+  const wrap = $('chart'), left = wrap.scrollLeft, right = left + wrap.clientWidth;
+  const cols = wrap.querySelectorAll('.bar-col');
+  let max = S.dayMins;
+  cols.forEach((c, i) => { if (c.offsetLeft + c.offsetWidth > left && c.offsetLeft < right) max = Math.max(max, chart.items[i].a, chart.items[i].s); });
+  max *= 1.08;
+  cols.forEach((c, i) => {
+    const it = chart.items[i], [ba, bs] = c.querySelectorAll('.bar');
+    ba.style.height = Math.max(1.5, Math.max(0, it.a) / max * 100) + '%';
+    bs.style.height = Math.max(1.5, Math.max(0, it.s) / max * 100) + '%';
+  });
 }
-function endScrub() {
-  const wrap = $('chart'); if (!wrap.classList.contains('scrubbing')) return;
-  wrap.classList.remove('scrubbing'); selBar = null;
-  wrap.querySelectorAll('.bar-col.sel').forEach(c => c.classList.remove('sel'));
-  setBig(L.balanceOn(S, L.today())[leaveType], true); setDeltaDefault();
-}
-let scrubbing = false, releaseT = 0;
-$('chart').addEventListener('pointerdown', e => { clearTimeout(releaseT); scrubbing = true; $('chart').setPointerCapture(e.pointerId); scrubAt(e.clientX); });
-$('chart').addEventListener('pointermove', e => { if (scrubbing) scrubAt(e.clientX); });
-$('chart').addEventListener('pointerup', () => { scrubbing = false; clearTimeout(releaseT); releaseT = setTimeout(endScrub, 1500); });
-$('chart').addEventListener('pointercancel', () => { scrubbing = false; endScrub(); });
+$('chart').addEventListener('scroll', () => { cancelAnimationFrame(rescaleRAF); rescaleRAF = requestAnimationFrame(rescale); }, { passive: true });
+$('chart').addEventListener('click', e => {
+  const col = e.target.closest('.bar-col'); if (!col) return;
+  const i = +col.dataset.i, it = chart.items[i];
+  const cols = $('chart').querySelectorAll('.bar-col');
+  if (selIdx === i || it.now) {           // tap again or tap Today: back to today
+    selIdx = null; cols.forEach(c => c.classList.remove('sel')); $('chart').classList.remove('picking');
+    showDate(L.today(), todayLabel()); return;
+  }
+  selIdx = i; cols.forEach((c, k) => c.classList.toggle('sel', k === i)); $('chart').classList.add('picking');
+  if (navigator.vibrate) navigator.vibrate(4);
+  showDate(it.date, L.fmtDate(it.date, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) + (it.future ? ', projected' : ''));
+});
 window.addEventListener('resize', () => { if (view === 'home') drawChart(false); });
 
 /* ---------- sheets ---------- */
@@ -227,7 +216,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('sheet'
 /* ---------- log / edit time off ---------- */
 function openTimeOff(u) {
   const editing = !!u;
-  let type = u ? u.type : leaveType;
+  let type = u ? u.type : 'annual';
   openSheet(editing ? 'Edit time off' : 'Log time off', `
     <div class="segmented" role="group" aria-label="Type" id="tType" style="margin-bottom:14px"><span class="thumb" aria-hidden="true"></span>
       <button aria-pressed="${type === 'annual'}" data-t="annual">Annual</button><button aria-pressed="${type === 'sick'}" data-t="sick">Sick</button></div>

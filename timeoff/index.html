@@ -27,29 +27,42 @@
 <link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
 <link rel="stylesheet" href="../assets/app.css">
 <style>
-  .hero { margin-top: 4px; }
-  .hero .segmented { max-width: 260px; margin-bottom: 22px; }
-  .big { font-size: 52px; line-height: 1; font-weight: 800; letter-spacing: -.035em; display: flex; align-items: baseline; gap: 10px; }
-  .big .unit { font-size: 22px; font-weight: 700; letter-spacing: -.01em; color: var(--ink-2); }
-  .sub-hours { font-size: 17px; font-weight: 600; color: var(--ink-2); margin-top: 8px; }
-  .delta { font-size: 15px; font-weight: 700; color: var(--accent); margin-top: 6px; min-height: 21px; transition: color .3s; }
-  .delta.scrub { color: var(--ink-2); }
-  .chart-wrap { margin-top: 22px; height: 170px; touch-action: none; user-select: none; -webkit-user-select: none; cursor: pointer; }
-  .bars { display: flex; align-items: stretch; gap: 6px; height: 100%; }
-  .bar-col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 8px; min-width: 0; }
-  .bar { width: 100%; max-width: 26px; border-radius: 7px 7px 3px 3px; background: var(--accent); opacity: .28; transform-origin: bottom;
-    transition: opacity .2s, transform .25s var(--spring), background-color .3s; }
-  .bar-col.now .bar { opacity: 1; }
-  .bar-col.future .bar { background: repeating-linear-gradient(135deg, var(--accent) 0 3px, transparent 3px 7px); opacity: .55; }
-  .scrubbing .bar-col .bar { opacity: .18; }
-  .scrubbing .bar-col.future .bar { opacity: .35; }
-  .bar-col.sel .bar { opacity: 1 !important; transform: scaleX(1.12); }
-  .bar-col.sel.future .bar { background: var(--accent); opacity: .6 !important; }
-  .bar-lbl { font-size: 11px; font-weight: 700; color: var(--ink-3); flex: 0 0 auto; line-height: 1; }
-  .bar-col.now .bar-lbl, .bar-col.sel .bar-lbl { color: var(--ink); }
+  .as-of { font-size: 15px; font-weight: 700; color: var(--ink-2); margin: 6px 0 10px; min-height: 21px; }
+  .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .tile-lbl { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 7px; }
+  .tile-lbl::before { content: ""; width: 10px; height: 10px; border-radius: 3px; background: var(--c); }
+  .tile-num { margin-top: 6px; display: flex; align-items: baseline; gap: 6px; }
+  .tile-num span:first-child { font-size: 44px; line-height: 1; font-weight: 800; letter-spacing: -.035em; }
+  .tile-num .u { font-size: 16px; font-weight: 700; color: var(--ink-2); }
+  .tile-hrs { font-size: 16px; font-weight: 700; color: var(--c); margin-top: 6px; }
+  .annual { --c: var(--annual); } .sick { --c: var(--sick); }
+
+  .chart-scroll { margin: 22px calc(-1 * var(--gutter)) 0; padding: 0 var(--gutter); overflow-x: auto; overflow-y: hidden;
+    scrollbar-width: none; -webkit-overflow-scrolling: touch; scroll-behavior: smooth;
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%);
+            mask-image: linear-gradient(90deg, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%); }
+  .chart-scroll::-webkit-scrollbar { display: none; }
+  .bars { display: flex; gap: 4px; height: 210px; width: max-content; padding-right: 8px; }
+  .bar-col { flex: 0 0 42px; display: flex; flex-direction: column; align-items: center; gap: 8px; border: 0; background: none; padding: 0; cursor: pointer; color: inherit; font: inherit; }
+  .bar-stack { position: relative; flex: 1; width: 100%; }
+  .bar { position: absolute; bottom: 0; left: 50%; border-radius: 6px 6px 2px 2px; transform-origin: bottom; transition: opacity .2s, height .35s var(--ease); }
+  .bar.a { width: 26px; margin-left: -13px; background: var(--annual); opacity: .35; }
+  .bar.s { width: 12px; margin-left: -6px; background: var(--sick); opacity: .55; }
+  .bar-col.now .bar.a, .bar-col.sel .bar.a { opacity: 1; }
+  .bar-col.now .bar.s, .bar-col.sel .bar.s { opacity: 1; }
+  .bar-col.future .bar.a { background: repeating-linear-gradient(135deg, var(--annual) 0 3px, transparent 3px 7px); opacity: .6; }
+  .bar-col.future .bar.s { opacity: .4; }
+  .picking .bar-col.now .bar { opacity: .35; }
+  .bar-col.sel.future .bar.a { background: var(--annual); opacity: .9; }
+  .bar-col.sel.future .bar.s { opacity: 1; }
+  .bar-lbl { position: relative; font-size: 11px; font-weight: 700; color: var(--ink-3); line-height: 1.2; text-align: center; height: 42px; }
+  .bar-lbl b { display: block; font-size: 13px; color: var(--ink-2); }
+  .bar-lbl em { display: block; font-style: normal; font-size: 10px; color: var(--ink-3); }
+  .bar-col.now .bar-lbl, .bar-col.sel .bar-lbl, .bar-col.now .bar-lbl b, .bar-col.sel .bar-lbl b { color: var(--ink); }
+  .bar-col.use .bar-lbl b::after { content: ""; display: block; width: 4px; height: 4px; border-radius: 50%; background: var(--danger); margin: 2px auto 0; }
   .grow { animation: grow .6s var(--spring) backwards; }
   @keyframes grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
-  .chart-labels { display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; color: var(--ink-3); margin-top: 8px; }
+  .chart-hint { font-size: 13px; font-weight: 600; color: var(--ink-3); margin: 10px 0 0; }
   .fade-up { animation: viewIn .5s var(--ease) both; }
   .credit-amt { font-weight: 700; color: var(--accent); }
   .actions { display: grid; gap: 10px; margin-top: 24px; }
@@ -75,21 +88,18 @@
 
   <!-- Home -->
   <section id="view-home" data-title="My time off">
-    <div class="hero">
-      <div class="segmented" role="group" aria-label="Leave type" id="typeToggle">
-        <span class="thumb" aria-hidden="true"></span>
-        <button aria-pressed="true" data-t="annual">Annual</button><button aria-pressed="false" data-t="sick">Sick</button>
-      </div>
-      <div class="big" aria-live="polite"><span id="bigNum">0</span><span class="unit" id="bigUnit">days</span></div>
-      <div class="sub-hours" id="subHours"></div>
-      <div class="delta" id="delta"></div>
-      <div class="chart-wrap" id="chart" role="img" aria-label="Balance at the end of each month. Tap or drag to see a month."></div>
-      <div class="chart-labels"><span id="lblStart"></span><span>Tap or drag a month</span><span id="lblEnd"></span></div>
+    <div class="as-of" id="asOfLine"></div>
+    <div class="tiles">
+      <div class="tile annual"><div class="tile-lbl">Annual</div><div class="tile-num"><span id="numA">0</span><span class="u">days</span></div><div class="tile-hrs" id="hrsA"></div></div>
+      <div class="tile sick"><div class="tile-lbl">Sick</div><div class="tile-num"><span id="numS">0</span><span class="u">days</span></div><div class="tile-hrs" id="hrsS"></div></div>
     </div>
+
+    <div class="chart-scroll" id="chart" aria-label="Balance on each deposit date. Swipe for more, tap a bar to see that date."></div>
+    <p class="chart-hint">Swipe for more dates. Tap a bar to see that day.</p>
 
     <div class="actions"><button class="btn" id="logBtn">Log time off</button></div>
 
-    <h2 class="section-head">Hours added</h2>
+    <h2 class="section-head">Deposits</h2>
     <div class="list" id="credits"></div>
 
     <h2 class="section-head">Time off</h2>
