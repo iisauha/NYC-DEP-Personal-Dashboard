@@ -337,7 +337,29 @@ document.addEventListener('click', e => {
 
 /* ---------- settings ---------- */
 const two = (a, s) => `<div class="row-value"><span style="color:var(--annual)">+${L.fmtHM(a)}</span> annual<small><span style="color:var(--sick);font-weight:600">+${L.fmtHM(s)}</span> sick</small></div>`;
+/* How much of this site's local storage is used. Browsers allow about 5 MB per site and
+   store text as UTF-16 (2 bytes per character); none report the exact limit, so 5 MB is an estimate. */
+const LS_LIMIT = 5 * 1024 * 1024;
+const fmtBytes = b => b < 1024 ? `${b} bytes` : b < 1048576 ? `${(b / 1024).toFixed(1)} KB` : `${(b / 1048576).toFixed(2)} MB`;
+function renderStorage() {
+  let used = 0;
+  try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); used += (k.length + (localStorage.getItem(k) || '').length) * 2; } }
+  catch (e) { $('storageSub').textContent = 'Storage is blocked in this browser'; return; }
+  const pct = used / LS_LIMIT * 100;
+  $('storageVal').innerHTML = `${fmtBytes(used)}<small>of about 5 MB</small>`;
+  $('storageBar').style.width = Math.min(100, pct) + '%';
+  const entries = S.uses.length;
+  const left = pct < 1 ? 'Almost all of it free' : `${fmtBytes(Math.max(0, LS_LIMIT - used))} free (${pct.toFixed(1)}% used)`;
+  $('storageSub').textContent = `${left}, ${entries} time-off ${entries === 1 ? 'day' : 'days'} saved`;
+  // ask the browser to keep this data from being cleared automatically when space runs low
+  if (navigator.storage && navigator.storage.persisted) navigator.storage.persisted().then(p => {
+    if (!p && navigator.storage.persist) return navigator.storage.persist();
+    return p;
+  }).then(p => { if (p) $('storageSub').textContent += '. Protected from automatic clearing'; }).catch(() => {});
+}
+
 function renderSettings() {
+  renderStorage();
   $('balTitle').innerHTML = `<span style="color:var(--annual);font-weight:600">${L.fmtHM(S.anchor.annual)}</span> annual, <span style="color:var(--sick);font-weight:600">${L.fmtHM(S.anchor.sick)}</span> sick`;
   const fromStart = S.anchor.date < S.startDate;
   if (fromStart) { const b = L.balanceOn(S, L.today()); $('balTitle').innerHTML = `<span style="color:var(--annual);font-weight:600">${L.fmtHM(b.annual)}</span> annual, <span style="color:var(--sick);font-weight:600">${L.fmtHM(b.sick)}</span> sick`; }

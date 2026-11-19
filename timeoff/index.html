@@ -87,6 +87,8 @@
   .sum-big { font-size: 28px; font-weight: 800; color: var(--ink); letter-spacing: -.02em; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
   .sum-big span { font-size: 15px; font-weight: 600; color: var(--ink-2); letter-spacing: 0; }
   .sum-sub { margin-top: 6px; line-height: 1.4; }
+  .meter { height: 6px; border-radius: 3px; background: var(--fill); margin-top: 8px; overflow: hidden; }
+  .meter i { display: block; height: 100%; width: 0; min-width: 3px; border-radius: 3px; background: var(--annual); transition: width .6s var(--ease); }
   .note { font-size: 14px; color: var(--ink-2); margin: 12px 0 0; line-height: 1.45; }
   @media (max-width: 360px) { .big { font-size: 44px; } }
 </style>
@@ -154,6 +156,10 @@
         <svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1 1l5.5 5.5L1 12" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></a>
       <button class="row" id="installRow" hidden><div class="row-main"><div class="row-title">Install app</div></div></button>
       <div class="row" id="iosInstallRow" hidden><div class="row-main"><div class="row-title">Add to Home Screen</div><div class="row-sub">In Safari, tap Share, then Add to Home Screen</div></div></div>
+      <div class="row" id="storageRow"><div class="row-main"><div class="row-title">Storage</div>
+        <div class="row-sub" id="storageSub">Checking...</div>
+        <div class="meter" aria-hidden="true"><i id="storageBar"></i></div></div>
+        <div class="row-value" id="storageVal"></div></div>
       <button class="row" id="exportBtn"><div class="row-main"><div class="row-title">Export backup</div></div></button>
       <button class="row" id="importBtn"><div class="row-main"><div class="row-title">Import backup</div></div></button>
     </div>
